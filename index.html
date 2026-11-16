@@ -1,0 +1,1248 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>体测仲裁教练 · 有效次数判定与打分</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232F80ED' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='12' cy='5' r='2.2'/%3E%3Cpath d='M12 7.5v5M12 12.5l-4.5 3M12 12.5l4.5 3M7.5 15.5l-1.5 4M16.5 15.5l1.5 4'/%3E%3C/svg%3E">
+<script src="pose.js" defer></script>
+<style>
+:root{
+  --bg:#F4F8FC; --card:#FFFFFF; --line:#DCE8F5; --line2:#C7DAEF;
+  --pri:#2F80ED; --pri-d:#1C6AD0; --pri-bg:#EAF3FE; --pri-bg2:#DDEBFB;
+  --txt:#1F2D3D; --sub:#66788F;
+  --ok:#1E9E5A; --ok-bg:#E8F7EF;
+  --bad:#E5484D; --bad-bg:#FDECEC;
+  --warn:#B7791F; --warn-bg:#FFF7E6;
+  --r:12px; --shadow:0 1px 3px rgba(31,45,61,.06),0 4px 14px rgba(31,45,61,.05);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font:14px/1.5 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif;color:var(--txt);background:var(--bg)}
+button{font:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,select{font:inherit;color:inherit}
+.hidden{display:none!important}
+svg{display:block}
+
+/* ===== 顶栏 ===== */
+.top{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;
+  height:54px;padding:0 16px;background:rgba(255,255,255,.8);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{width:34px;height:34px;border-radius:9px;background:var(--pri-bg);display:flex;align-items:center;justify-content:center;color:var(--pri)}
+.brand h1{font-size:16px;font-weight:700;letter-spacing:.5px}
+.brand .sub{font-size:11px;color:var(--sub)}
+.top-r{display:flex;align-items:center;gap:8px}
+.chip-btn{font-size:12px;padding:5px 10px;border:1px solid var(--line);border-radius:20px;background:#fff;color:var(--sub)}
+.chip-btn.on{color:var(--pri);border-color:var(--pri-bg2);background:var(--pri-bg)}
+.user-chip{display:flex;align-items:center;gap:6px;padding:5px 12px;border:1px solid var(--line2);border-radius:20px;background:#fff;font-weight:600;font-size:13px}
+.user-chip:hover{border-color:var(--pri)}
+
+/* ===== 页签 ===== */
+.tabs{display:flex;gap:6px;padding:10px 16px 0;max-width:1200px;margin:0 auto}
+.tabs button{padding:8px 18px;border-radius:10px 10px 0 0;font-size:14px;color:var(--sub);border-bottom:2px solid transparent}
+.tabs button.active{color:var(--pri);font-weight:700;background:var(--card);border-bottom:2px solid var(--pri);box-shadow:var(--shadow)}
+
+main{max-width:1200px;margin:0 auto;padding:12px 16px 40px}
+.tab{display:none}
+.tab.active{display:block}
+
+/* ===== 卡片 ===== */
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:14px}
+.card h3{font-size:13px;color:var(--sub);font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.card h3 svg{color:var(--pri)}
+
+/* ===== 测试页布局 ===== */
+.test-grid{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:12px;align-items:start}
+.side{display:flex;flex-direction:column;gap:12px}
+.ex-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.ex-chip{display:flex;align-items:center;gap:6px;padding:7px 14px;border:1px solid var(--line);border-radius:10px;background:#fff;font-size:13px;color:var(--sub)}
+.ex-chip.active{background:var(--pri);border-color:var(--pri);color:#fff;font-weight:600}
+.ex-chip:disabled{opacity:.5;cursor:not-allowed}
+
+.stage{position:relative;width:100%;aspect-ratio:4/3;background:#0E1726;border-radius:10px;overflow:hidden}
+@supports not (aspect-ratio:1){.stage{height:0;padding-top:75%}}
+.stage video,.stage canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.stage.mirror video,.stage.mirror canvas{transform:scaleX(-1)}
+.stage-idle{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#8FA6C4;background:rgba(14,23,38,.6)}
+.stage-idle p{font-size:15px;font-weight:600;color:#C9DAF0}
+.stage-idle span{font-size:12px}
+.flash{position:absolute;top:14px;left:50%;transform:translateX(-50%);padding:10px 22px;border-radius:12px;font-size:20px;font-weight:800;
+  backdrop-filter:blur(8px);pointer-events:none;opacity:0}
+.flash.show{animation:fl .95s ease forwards}
+.flash.ok{background:rgba(30,158,90,.85);color:#fff;box-shadow:0 6px 22px rgba(30,158,90,.45)}
+.flash.bad{background:rgba(229,72,77,.9);color:#fff;box-shadow:0 6px 22px rgba(229,72,77,.45)}
+@keyframes fl{0%{opacity:0;transform:translateX(-50%) scale(.7)}12%{opacity:1;transform:translateX(-50%) scale(1.06)}22%{transform:translateX(-50%) scale(1)}78%{opacity:1}100%{opacity:0;transform:translateX(-50%) translateY(-8px)}}
+.stage-hint{position:absolute;left:12px;right:12px;bottom:12px;padding:8px 12px;border-radius:8px;background:rgba(183,121,31,.92);color:#fff;font-size:12px}
+
+.ctrl-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px}
+.seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{padding:6px 12px;font-size:13px;color:var(--sub);background:#fff}
+.seg button.active{background:var(--pri);color:#fff}
+.sel{padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;font-size:13px;color:var(--txt)}
+.spacer{flex:1}
+.timer{font-variant-numeric:tabular-nums;font-size:18px;font-weight:700;color:var(--pri);letter-spacing:1px}
+.timer.hot{color:var(--bad)}
+
+.btn{padding:7px 16px;border-radius:9px;background:var(--pri);color:#fff;font-weight:600;font-size:13px}
+.btn:hover{background:var(--pri-d)}
+.btn.ghost{background:#fff;color:var(--pri);border:1px solid var(--pri-bg2)}
+.btn.ghost:hover{background:var(--pri-bg)}
+.btn.danger{background:var(--bad)}
+.btn.danger:hover{background:#C93A3F}
+.btn.small{padding:4px 10px;font-size:12px;border-radius:7px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.tips{margin-top:8px;font-size:12px;color:var(--sub);line-height:1.7}
+.tips b{color:var(--txt)}
+
+.count-card{display:flex;gap:10px}
+.big{flex:1;text-align:center;padding:10px 0;border-radius:10px}
+.big span{font-size:38px;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums;display:block}
+.big label{font-size:12px;color:var(--sub)}
+.big.ok{background:var(--ok-bg);color:var(--ok)}
+.big.bad{background:var(--bad-bg);color:var(--bad)}
+
+.metrics{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+.m-row{display:flex;justify-content:space-between;font-size:13px}
+.m-row label{color:var(--sub)}
+.m-row b{font-variant-numeric:tabular-nums}
+.prog{height:8px;border-radius:4px;background:var(--pri-bg);overflow:hidden}
+.prog i{display:block;height:100%;width:0;background:linear-gradient(90deg,#5EA0F2,var(--pri));border-radius:4px;transition:width .12s}
+.state-txt{margin-top:8px;font-size:12px;color:var(--sub)}
+.logs{list-style:none;max-height:190px;overflow-y:auto;display:flex;flex-direction:column;gap:4px}
+.logs li{font-size:12px;padding:5px 8px;border-radius:7px;background:#F6FAFE;color:var(--sub);display:flex;gap:6px}
+.logs li .t{color:#9AAABC;font-variant-numeric:tabular-nums}
+.logs li.ok{background:var(--ok-bg);color:var(--ok)}
+.logs li.bad{background:var(--bad-bg);color:var(--bad)}
+.logs li.empty{background:none;justify-content:center}
+
+/* ===== 记录页 ===== */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 14px}
+.stat label{font-size:12px;color:var(--sub);display:block}
+.stat b{font-size:20px;font-weight:800}
+.stat small{color:var(--sub);font-size:11px}
+.toolbar{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.toolbar .note{font-size:12px;color:var(--sub)}
+#recTableBox,.plan-box{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table.tb{width:100%;min-width:520px;border-collapse:collapse;font-size:13px}
+.tb th{text-align:left;padding:8px 10px;background:var(--pri-bg);color:var(--pri-d);font-size:12px;font-weight:600}
+.tb th:first-child{border-radius:8px 0 0 8px}.tb th:last-child{border-radius:0 8px 8px 0}
+.tb td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+.tb tr:hover td{background:#FAFCFF}
+.tb .score{font-weight:800;color:var(--pri)}
+.tb .score.s-hi{color:var(--ok)}.tb .score.s-mid{color:var(--pri)}.tb .score.s-low{color:var(--warn)}.tb .score.s-zero{color:var(--bad)}
+.rule-tag{font-size:11px;color:var(--sub);background:#F1F6FC;padding:2px 8px;border-radius:10px;display:inline-block;margin-top:2px}
+.empty-box{text-align:center;padding:40px 0;color:var(--sub)}
+.empty-box p{margin-top:6px;font-size:13px}
+
+/* ===== 规则页 ===== */
+.page-note{font-size:12px;color:var(--sub);background:var(--pri-bg);border:1px solid var(--pri-bg2);border-radius:10px;padding:10px 14px;margin-bottom:12px;line-height:1.8}
+.rule-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px}
+.rule-card .rc-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.rule-card .rc-head b{font-size:15px}
+.v-badge{font-size:11px;font-weight:700;color:var(--pri);background:var(--pri-bg);padding:2px 9px;border-radius:10px}
+.rc-time{font-size:11px;color:var(--sub);margin-bottom:8px}
+.rc-rows{display:grid;grid-template-columns:1fr 1fr;gap:4px 14px;font-size:12px;margin-bottom:10px}
+.rc-rows div{display:flex;justify-content:space-between;color:var(--sub);border-bottom:1px dashed var(--line);padding:2px 0}
+.rc-rows div b{color:var(--txt)}
+.rc-curve{margin:2px 0 10px}
+.rc-foot{display:flex;gap:8px;align-items:center}
+.hist{margin-top:10px;border-top:1px dashed var(--line);padding-top:8px}
+.hist summary{font-size:12px;color:var(--sub);cursor:pointer}
+.hist ul{list-style:none;margin-top:6px;display:flex;flex-direction:column;gap:4px}
+.hist li{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--sub)}
+.hist li b{color:var(--txt)}
+
+/* ===== 计划页 ===== */
+.plan-head{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.plan-box table.tb td,.plan-box table.tb th{text-align:center}
+.plan-week{font-weight:700;color:var(--pri)}
+.plan-note{font-size:12px;color:var(--sub);margin-top:10px;line-height:1.8}
+
+/* ===== 弹窗（毛玻璃） ===== */
+.modal{position:fixed;inset:0;z-index:100;display:none;align-items:center;justify-content:center;background:rgba(31,45,61,.38);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);padding:16px}
+.modal.open{display:flex}
+.m-panel{width:100%;max-width:520px;max-height:88vh;overflow:auto;background:rgba(255,255,255,.86);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border:1px solid rgba(255,255,255,.7);border-radius:16px;box-shadow:0 18px 50px rgba(31,45,61,.25);padding:18px}
+.m-panel.wide{max-width:640px}
+.m-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.m-head b{font-size:16px}
+.m-close{width:28px;height:28px;border-radius:8px;color:var(--sub);display:flex;align-items:center;justify-content:center}
+.m-close:hover{background:var(--pri-bg);color:var(--pri)}
+.field{margin-bottom:12px}
+.field label{display:block;font-size:12px;color:var(--sub);margin-bottom:5px}
+.field input[type=text],.field input[type=number],.field select{width:100%;padding:8px 10px;border:1px solid var(--line2);border-radius:9px;background:#fff}
+.field input:focus,.field select:focus{outline:none;border-color:var(--pri);box-shadow:0 0 0 3px var(--pri-bg)}
+.m-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+.preset-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.preset-row .btn{background:#fff;color:var(--pri);border:1px solid var(--pri-bg2)}
+.preset-row .btn:hover{background:var(--pri-bg)}
+.rows-editor{border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:10px}
+.rows-editor .re-head,.re-row{display:grid;grid-template-columns:1fr 1fr 40px;padding:0 0}
+.rows-editor .re-head{background:var(--pri-bg);font-size:12px;color:var(--pri-d);font-weight:600}
+.rows-editor .re-head span,.re-row span{padding:7px 10px}
+.re-row{border-top:1px solid var(--line);align-items:center}
+.re-row input{width:100%;border:none;background:transparent;padding:7px 10px;font-size:13px}
+.re-row input:focus{outline:none;background:var(--pri-bg)}
+.re-row .del{color:var(--bad);display:flex;align-items:center;justify-content:center;height:100%}
+.err-msg{font-size:12px;color:var(--bad);margin:4px 0}
+.user-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;background:#fff}
+.user-item.cur{border-color:var(--pri);background:var(--pri-bg)}
+.user-item b{flex:1;font-size:14px}
+.user-item .acts{display:flex;gap:6px}
+.link-btn{font-size:12px;color:var(--pri)}
+.link-btn.danger{color:var(--bad)}
+
+/* 结果弹窗 */
+.res-count{text-align:center;margin:6px 0 4px}
+.res-count .n{font-size:52px;font-weight:800;color:var(--pri);line-height:1.1;font-variant-numeric:tabular-nums}
+.res-count .l{font-size:13px;color:var(--sub)}
+.res-sub{display:flex;justify-content:center;gap:18px;font-size:12px;color:var(--sub);margin-bottom:12px}
+.res-score{display:flex;align-items:center;justify-content:center;gap:10px;background:var(--pri-bg);border-radius:12px;padding:12px;margin-bottom:6px}
+.res-score .s{font-size:40px;font-weight:800;color:var(--pri)}
+.res-score .u{font-size:14px;color:var(--sub)}
+.res-rule{font-size:12px;color:var(--sub);text-align:center;margin-bottom:4px}
+.res-fix{font-size:11px;color:var(--warn);text-align:center;background:var(--warn-bg);border-radius:8px;padding:6px 10px;line-height:1.6}
+
+/* toast */
+.toasts{position:fixed;top:64px;right:16px;z-index:200;display:flex;flex-direction:column;gap:8px}
+.toast{background:rgba(31,45,61,.92);color:#fff;font-size:13px;padding:10px 16px;border-radius:10px;box-shadow:0 8px 24px rgba(31,45,61,.3);animation:ts .3s ease}
+.toast.ok{background:rgba(30,158,90,.94)}
+.toast.bad{background:rgba(229,72,77,.94)}
+@keyframes ts{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:none}}
+
+footer{max-width:1200px;margin:0 auto;padding:0 16px 24px;font-size:11px;color:#9AAABC}
+
+@media (max-width:900px){
+  .test-grid{grid-template-columns:1fr}
+  .brand .sub{display:none}
+}
+@media (max-width:700px){
+  body{font-size:13px}
+  .top{padding:0 10px;height:50px}
+  main{padding:10px 10px 28px}
+  .tabs{padding:8px 10px 0;overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .tabs button{white-space:nowrap;padding:8px 14px}
+  .stage{aspect-ratio:3/4}
+  @supports not (aspect-ratio:1){.stage{padding-top:133%}}
+  .rule-grid{grid-template-columns:1fr}
+  .big span{font-size:30px}
+  .ctrl-row{gap:6px}
+  .btn{padding:9px 16px}
+  .sel{max-width:44%}
+  .m-panel{padding:14px}
+  .flash{font-size:17px;padding:8px 18px}
+  .brand h1{font-size:15px}
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <div class="logo">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="2.2"/><path d="M12 7.5v5"/><path d="M12 12.5l-4.5 3"/><path d="M12 12.5l4.5 3"/><path d="M7.5 15.5l-1.5 4"/><path d="M16.5 15.5l1.5 4"/><path d="M4 4l16 16" stroke-dasharray="2 3"/></svg>
+    </div>
+    <div>
+      <h1>体测仲裁教练</h1>
+      <div class="sub">不数"做了几个"，只判"这一下算不算数" · 并按规则打分</div>
+    </div>
+  </div>
+  <div class="top-r">
+    <button id="voiceBtn" class="chip-btn on" title="语音纠正提示开关">语音开</button>
+    <button id="userBtn" class="user-chip">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5"/></svg>
+      <span id="userName">未选择用户</span>
+    </button>
+  </div>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button data-tab="test" class="active">开始测试</button>
+  <button data-tab="records">测试记录</button>
+  <button data-tab="rules">打分规则</button>
+  <button data-tab="plan">训练计划</button>
+</nav>
+
+<main>
+  <!-- ========== 开始测试 ========== -->
+  <section id="tab-test" class="tab active">
+    <div class="test-grid">
+      <div class="card stage-card">
+        <div class="ex-row" id="exChips"></div>
+        <div class="stage" id="stage">
+          <video id="video" playsinline muted></video>
+          <canvas id="cv"></canvas>
+          <div id="flash" class="flash"></div>
+          <div id="stageHint" class="stage-hint hidden"></div>
+          <div id="stageIdle" class="stage-idle">
+            <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="2" y="6" width="14" height="12" rx="2.5"/><path d="M16 10l6-3v10l-6-3"/></svg>
+            <p>摄像头 / 视频未启动</p>
+            <span>选择项目与模式后点击「开始测试」</span>
+          </div>
+        </div>
+        <div class="ctrl-row">
+          <div class="seg" id="modeSeg">
+            <button data-mode="cam" class="active">摄像头实时</button>
+            <button data-mode="file">上传视频分析</button>
+          </div>
+          <select id="camFace" class="sel" title="摄像头选择">
+            <option value="user">前置摄像头</option>
+            <option value="environment">后置摄像头</option>
+          </select>
+          <div class="seg" id="strictSeg" title="判定严格度：宽松 / 标准 / 严格">
+            <button data-s="loose">宽松</button>
+            <button data-s="std">标准</button>
+            <button data-s="strict">严格</button>
+          </div>
+          <select id="durSel" class="sel" title="限时">
+            <option value="0">不限时</option>
+            <option value="60">限时 60 秒</option>
+            <option value="30">限时 30 秒</option>
+          </select>
+          <input type="file" id="fileIn" accept="video/*" class="hidden">
+          <button id="fileBtn" class="btn ghost small hidden">选择视频文件</button>
+          <span class="spacer"></span>
+          <span id="timer" class="timer">00:00</span>
+          <button id="startBtn" class="btn">开始测试</button>
+          <button id="stopBtn" class="btn danger hidden">结束测试</button>
+        </div>
+        <p class="tips" id="shootTips"></p>
+      </div>
+
+      <aside class="side">
+        <div class="card count-card">
+          <div class="big ok"><span id="validN">0</span><label>有效次数</label></div>
+          <div class="big bad"><span id="invalidN">0</span><label>无效次数</label></div>
+        </div>
+        <div class="card">
+          <h3><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>实时判定</h3>
+          <div id="metrics" class="metrics"><div class="m-row"><label>等待开始…</label><b>—</b></div></div>
+          <div class="prog"><i id="progBar"></i></div>
+          <p id="stateTxt" class="state-txt">—</p>
+        </div>
+        <div class="card">
+          <h3><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg>仲裁日志</h3>
+          <ul id="logList" class="logs"><li class="empty">暂无判定记录</li></ul>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ========== 测试记录 ========== -->
+  <section id="tab-records" class="tab">
+    <div class="stat-grid" id="statCards"></div>
+    <div class="toolbar">
+      <select id="recFilter" class="sel"><option value="">全部项目</option></select>
+      <span class="note" id="recCount"></span>
+      <span class="spacer"></span>
+      <button id="exportBtn" class="btn ghost small">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:inline-block;vertical-align:-2px"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 21h16"/></svg>
+        导出 CSV
+      </button>
+    </div>
+    <div class="card" id="recTableBox"></div>
+  </section>
+
+  <!-- ========== 打分规则 ========== -->
+  <section id="tab-rules" class="tab">
+    <div class="page-note">
+      <b>打分规则说明：</b>每个项目的「有效次数 → 得分」对照表由你自己设定（如：仰卧起坐 26 个=60 分、56 个=100 分）。
+      每次保存修改都会生成新版本，<b>历史测试成绩按"当时生效的规则版本"计算并固定不变</b>；下次测试自动使用最新规则，想换规则随时可改、可恢复历史版本。
+    </div>
+    <div class="rule-grid" id="ruleCards"></div>
+  </section>
+
+  <!-- ========== 训练计划 ========== -->
+  <section id="tab-plan" class="tab">
+    <div class="plan-head">
+      <div class="ex-row" id="planExChips" style="margin:0"></div>
+      <select id="planTarget" class="sel" title="目标得分"></select>
+    </div>
+    <div class="card plan-box" id="planBox"></div>
+  </section>
+</main>
+
+<footer>体测仲裁教练 v1.0 · 姿态判定基于 MediaPipe Pose · 用户、规则与成绩数据仅保存在本机浏览器（localStorage），不上传服务器</footer>
+
+<!-- 用户管理弹窗 -->
+<div class="modal" id="userModal">
+  <div class="m-panel">
+    <div class="m-head"><b>用户管理</b><button class="m-close" data-close="userModal">✕</button></div>
+    <p id="userModalNote" class="page-note hidden" style="margin-bottom:12px">请先创建一个用户：打分规则与测试成绩将<b>按用户分开保存</b>，成绩记录后固定不变。</p>
+    <div class="field">
+      <label>新增用户姓名</label>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="newUserName" placeholder="例如：张小体" maxlength="12">
+        <button id="addUserBtn" class="btn">创建</button>
+      </div>
+    </div>
+    <div id="userList"></div>
+  </div>
+</div>
+
+<!-- 规则编辑弹窗 -->
+<div class="modal" id="ruleModal">
+  <div class="m-panel wide">
+    <div class="m-head"><b id="ruleModalTitle">编辑打分规则</b><button class="m-close" data-close="ruleModal">✕</button></div>
+    <div class="field">
+      <label>规则名称（可选，方便识别，如"国家标准·男 大一大二"）</label>
+      <input type="text" id="ruleNameIn" maxlength="24" placeholder="留空则自动命名为 v{版本号}">
+    </div>
+    <div class="field">
+      <label>快速套用预设（套用后仍可在下方表格中自由修改）</label>
+      <div class="preset-row" id="presetRow"></div>
+    </div>
+    <div class="field">
+      <label>次数 → 得分 对照表（有效次数达到「最低个数」即得对应分数，按个数升序）</label>
+      <div class="rows-editor" id="rowsEditor">
+        <div class="re-head"><span>最低个数（达到即得分）</span><span>得分（分）</span><span></span></div>
+        <div id="rowsEditorBody"></div>
+      </div>
+      <button id="addRowBtn" class="btn ghost small">＋ 添加一档</button>
+      <p class="err-msg hidden" id="ruleErr"></p>
+    </div>
+    <div class="m-foot">
+      <button class="btn ghost" data-close="ruleModal">取消</button>
+      <button id="saveRuleBtn" class="btn">保存为新版本</button>
+    </div>
+  </div>
+</div>
+
+<!-- 测试结果弹窗 -->
+<div class="modal" id="resultModal">
+  <div class="m-panel">
+    <div class="m-head"><b>本次测试结果</b><button class="m-close" data-close="resultModal">✕</button></div>
+    <div class="res-count"><div class="n" id="resValid">0</div><div class="l" id="resExName">有效次数</div></div>
+    <div class="res-sub"><span>无效：<b id="resInvalid">0</b> 次</span><span>用时：<b id="resDur">—</b></span></div>
+    <div class="res-score"><span class="s" id="resScore">0</span><span class="u">分</span></div>
+    <p class="res-rule" id="resRuleTxt"></p>
+    <p class="res-fix">本成绩将按「当时生效的规则版本」计算并固定存档；之后修改规则不影响历史成绩。</p>
+    <div class="m-foot">
+      <button id="saveRecBtn" class="btn">保存为正式成绩</button>
+      <button id="practiceBtn" class="btn ghost">仅练习，不保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 通用确认弹窗 -->
+<div class="modal" id="confirmModal">
+  <div class="m-panel" style="max-width:380px">
+    <div class="m-head"><b id="cfTitle">确认操作</b><span></span></div>
+    <p id="cfText" style="font-size:13px;color:var(--sub);line-height:1.8"></p>
+    <div class="m-foot">
+      <button id="cfCancel" class="btn ghost">取消</button>
+      <button id="cfOk" class="btn danger">确认</button>
+    </div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+
+<script>
+/* ================= 基础工具 ================= */
+const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
+const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtTs=ts=>{const d=new Date(ts);const p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`};
+const fmtDur=s=>{s=Math.round(s);const m=Math.floor(s/60);return `${String(m).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`};
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+
+function toast(msg,kind=''){const box=$('#toasts');const el=document.createElement('div');el.className='toast '+kind;el.textContent=msg;box.appendChild(el);setTimeout(()=>{el.style.opacity='0';el.style.transition='opacity .3s';setTimeout(()=>el.remove(),320)},2600);}
+function openModal(id){$('#'+id).classList.add('open')}
+function closeModal(id){$('#'+id).classList.remove('open')}
+$$('.m-close').forEach(b=>b.addEventListener('click',()=>closeModal(b.dataset.close)));
+$$('[data-close]').forEach(b=>{if(b.tagName==='BUTTON'&&b.classList.contains('ghost'))b.addEventListener('click',()=>closeModal(b.dataset.close))});
+
+let cfCb=null;
+function confirmBox(title,text,okLabel,cb){$('#cfTitle').textContent=title;$('#cfText').textContent=text;$('#cfOk').textContent=okLabel||'确认';cfCb=cb;openModal('confirmModal')}
+$('#cfOk').addEventListener('click',()=>{closeModal('confirmModal');if(cfCb)cfCb()});
+$('#cfCancel').addEventListener('click',()=>closeModal('confirmModal'));
+
+/* 语音提示 */
+let voiceOn=(localStorage.getItem('tzb_voice')??'1')==='1';
+function say(t){if(!voiceOn)return;try{const u=new SpeechSynthesisUtterance(t);u.lang='zh-CN';u.rate=1.15;speechSynthesis.cancel();speechSynthesis.speak(u);}catch(e){}}
+function renderVoiceBtn(){$('#voiceBtn').textContent=voiceOn?'语音开':'语音关';$('#voiceBtn').classList.toggle('on',voiceOn)}
+$('#voiceBtn').addEventListener('click',()=>{voiceOn=!voiceOn;localStorage.setItem('tzb_voice',voiceOn?'1':'0');renderVoiceBtn()});
+renderVoiceBtn();
+
+/* ================= 项目定义 ================= */
+const EXERCISES={
+  pullup:{name:'引体向上',unit:'次',icon:'bar',shoot:'<b>机位建议：</b>手机正面架在单杠正前方 2~3 米，<b>全身与双手必须同框</b>。判定逻辑：以双手握杠位置为杠线，下巴（头部）过线且无蹬腿摆动才算有效。',defPreset:'pullup_m12'},
+  situp:{name:'1分钟仰卧起坐',unit:'个',icon:'sit',shoot:'<b>机位建议：</b>从<b>侧面</b>拍摄，能同时看到肩、髋、膝。判定逻辑：躯干抬起至肩-髋-膝夹角达标才算有效，回落不完全判无效。',defPreset:'situp_f12'},
+  squat:{name:'深蹲',unit:'个',icon:'squat',shoot:'<b>机位建议：</b>正对镜头站立，全身入镜。判定逻辑：下蹲到大腿近似水平（膝角达标）再站直才有效；正对视角下会同时监测膝盖内扣。',defPreset:'generic'},
+  pushup:{name:'俯卧撑',unit:'个',icon:'push',shoot:'<b>机位建议：</b>从<b>侧面</b>拍摄，身体呈水平。判定逻辑：胸口下放到肘角达标再撑直才有效；塌腰/撅臀判无效。',defPreset:'generic'}
+};
+
+/* ================= 判定严格度（面向所有用户，默认宽松，可自行调档） ================= */
+let strictLevel=localStorage.getItem('tzb_strict')||'loose';
+if(!['loose','std','strict'].includes(strictLevel))strictLevel='loose';
+const STRICT_LABELS={loose:'宽松（日常练习友好）',std:'标准（常规体测口径）',strict:'严格（裁判级从严）'};
+/* 各项目三档判定阈值：loose 宽松 / std 标准 / strict 严格 */
+const TH={
+  pullup:{
+    loose:{cross:-0.028,knee:92,hangY:-0.075,hangE:138,pullE:140,downY:-0.045,downE:135,ignoreE:128},
+    std:{cross:-0.006,knee:104,hangY:-0.085,hangE:146,pullE:144,downY:-0.055,downE:140,ignoreE:132},
+    strict:{cross:0.012,knee:112,hangY:-0.09,hangE:155,pullE:148,downY:-0.06,downE:145,ignoreE:135}
+  },
+  situp:{loose:{up:95,down:108},std:{up:88,down:116},strict:{up:82,down:124}},
+  squat:{loose:{deep:125,stand:150,valgus:0.075},std:{deep:112,stand:154,valgus:0.06},strict:{deep:102,stand:158,valgus:0.05}},
+  pushup:{loose:{deep:118,up:145,body:148},std:{deep:110,up:150,body:152},strict:{deep:105,up:152,body:158}}
+};
+
+/* ================= 评分预设（依据《国家学生体质健康标准》2014年修订） ================= */
+function mkRows(pairs){return pairs.map(([min,score])=>({min,score}))}
+const PRESETS={
+  pullup_m12:{label:'国标·男 大一大二',rows:mkRows([[5,10],[6,20],[7,30],[8,40],[9,50],[10,60],[11,64],[12,68],[13,72],[14,76],[15,80],[16,85],[17,90],[18,95],[19,100]])},
+  pullup_m34:{label:'国标·男 大三大四',rows:mkRows([[6,10],[7,20],[8,30],[9,40],[10,50],[11,60],[12,64],[13,68],[14,72],[15,76],[16,80],[17,85],[18,90],[19,95],[20,100]])},
+  situp_f12:{label:'国标·女 大一大二',rows:mkRows([[16,10],[18,20],[20,30],[22,40],[24,50],[26,60],[28,62],[30,64],[32,66],[34,68],[36,70],[38,72],[40,74],[42,76],[44,78],[46,80],[49,85],[52,90],[54,95],[56,100]])},
+  situp_f34:{label:'国标·女 大三大四',rows:mkRows([[17,10],[19,20],[21,30],[23,40],[25,50],[27,60],[29,62],[31,64],[33,66],[35,68],[37,70],[39,72],[41,74],[43,76],[45,78],[47,80],[50,85],[53,90],[55,95],[57,100]])},
+  generic:{label:'通用训练预设',rows:mkRows([[5,10],[10,20],[15,30],[20,40],[25,50],[30,60],[35,70],[40,80],[45,90],[50,100]])}
+};
+/* 各项目可用的预设按钮 */
+const EX_PRESETS={pullup:['pullup_m12','pullup_m34','generic'],situp:['situp_f12','situp_f34','generic'],squat:['generic'],pushup:['generic']};
+const STD_NOTE={pullup:'引体向上预设取自《国家学生体质健康标准》(2014年修订)男生单项评分表；60分=及格线，100分=满分。',situp:'仰卧起坐预设取自《国家学生体质健康标准》(2014年修订)女生一分钟仰卧起坐单项评分表。'};
+
+/* ================= 数据存储 ================= */
+const store={
+  users(){try{return JSON.parse(localStorage.getItem('tzb_users')||'[]')}catch(e){return []}},
+  saveUsers(u){localStorage.setItem('tzb_users',JSON.stringify(u))},
+  active(){return localStorage.getItem('tzb_active')||''},
+  setActive(id){localStorage.setItem('tzb_active',id)},
+  rules(uidv){try{return JSON.parse(localStorage.getItem('tzb_rules_'+uidv)||'{}')}catch(e){return {}}},
+  saveRules(uidv,r){localStorage.setItem('tzb_rules_'+uidv,JSON.stringify(r))},
+  records(uidv){try{return JSON.parse(localStorage.getItem('tzb_records_'+uidv)||'[]')}catch(e){return []}},
+  saveRecords(uidv,r){localStorage.setItem('tzb_records_'+uidv,JSON.stringify(r))},
+};
+function activeUser(){const id=store.active();return store.users().find(u=>u.id===id)||null}
+
+/* ================= 打分引擎 ================= */
+function calcScore(count,rows){
+  let best=0;
+  const sorted=[...rows].sort((a,b)=>a.min-b.min);
+  for(const r of sorted){if(count>=r.min)best=r.score;else break;}
+  return best;
+}
+function ruleSummary(rows,unit){
+  const s=[...rows].sort((a,b)=>a.min-b.min);
+  if(!s.length)return '未设定';
+  const f=r=>`${r.min}${unit||''}=${r.score}分`;
+  if(s.length<=3)return s.map(f).join(' · ');
+  return `${f(s[0])} · ${f(s[1])} · … · ${f(s[s.length-1])}`;
+}
+function gradeOf(score){return score>=90?'优秀':score>=80?'良好':score>=60?'及格':score>0?'不及格':'未得分'}
+function initRulesIfEmpty(uidv){
+  const r=store.rules(uidv);
+  let changed=false;
+  for(const exId of Object.keys(EXERCISES)){
+    if(!r[exId]){
+      const p=PRESETS[EXERCISES[exId].defPreset];
+      r[exId]={v:1,name:`初始化预设（${p.label}）`,updatedAt:Date.now(),rows:p.rows.map(x=>({...x})),history:[]};
+      changed=true;
+    }
+  }
+  if(changed)store.saveRules(uidv,r);
+  return r;
+}
+
+/* ================= 用户系统 ================= */
+function renderUsers(){
+  const box=$('#userList'),users=store.users(),cur=store.active();
+  if(!users.length){box.innerHTML='<div class="empty-box"><p>还没有用户</p></div>';return}
+  box.innerHTML=users.map(u=>`
+    <div class="user-item ${u.id===cur?'cur':''}">
+      <b>${esc(u.name)}</b>
+      ${u.id===cur?'<span style="font-size:11px;color:var(--pri)">当前</span>':''}
+      <div class="acts">
+        ${u.id===cur?'':`<button class="link-btn" data-act="switch" data-id="${u.id}">设为当前</button>`}
+        <button class="link-btn" data-act="rename" data-id="${u.id}">重命名</button>
+        <button class="link-btn danger" data-act="del" data-id="${u.id}">删除</button>
+      </div>
+    </div>`).join('');
+}
+$('#userList').addEventListener('click',e=>{
+  const btn=e.target.closest('button[data-act]');if(!btn)return;
+  const id=btn.dataset.id,act=btn.dataset.act;
+  const users=store.users();
+  if(act==='switch'){store.setActive(id);afterUserSwitch();renderUsers();toast('已切换用户','ok')}
+  else if(act==='rename'){
+    const u=users.find(x=>x.id===id);if(!u)return;
+    const name=prompt('输入新姓名：',u.name);
+    if(name&&name.trim()){u.name=name.trim();store.saveUsers(users);renderUsers();afterUserSwitch();toast('已重命名','ok')}
+  }
+  else if(act==='del'){
+    const u=users.find(x=>x.id===id);if(!u)return;
+    confirmBox('删除用户',`将永久删除用户「${u.name}」及其全部打分规则与测试记录，且无法恢复。确定删除？`,'删除',()=>{
+      const left=users.filter(x=>x.id!==id);store.saveUsers(left);
+      localStorage.removeItem('tzb_rules_'+id);localStorage.removeItem('tzb_records_'+id);
+      if(store.active()===id){store.setActive(left.length?left[0].id:'')}
+      renderUsers();afterUserSwitch();toast('已删除','ok');
+    });
+  }
+});
+$('#addUserBtn').addEventListener('click',()=>{
+  const inp=$('#newUserName'),name=inp.value.trim();
+  if(!name){toast('请输入姓名','bad');return}
+  const users=store.users();
+  if(users.some(u=>u.name===name)){toast('已存在同名用户','bad');return}
+  const u={id:uid(),name,createdAt:Date.now()};
+  users.push(u);store.saveUsers(users);store.setActive(u.id);
+  initRulesIfEmpty(u.id);
+  inp.value='';renderUsers();afterUserSwitch();
+  $('#userModalNote').classList.add('hidden');
+  closeModal('userModal');
+  toast(`用户「${name}」已创建，已按《国家学生体质健康标准》初始化打分规则`,'ok');
+});
+$('#newUserName').addEventListener('keydown',e=>{if(e.key==='Enter')$('#addUserBtn').click()});
+$('#userBtn').addEventListener('click',()=>{renderUsers();openModal('userModal')});
+
+function afterUserSwitch(){
+  const u=activeUser();
+  $('#userName').textContent=u?u.name:'未选择用户';
+  if(u)initRulesIfEmpty(u.id);
+  renderExChips();renderRuleCards();renderRecords();renderPlan();renderVoiceBtn();
+}
+/*P2*/
+/* ================= 姿态仲裁引擎 ================= */
+/* MediaPipe Pose 33 关键点索引 */
+const LM={nose:0,shL:11,shR:12,elL:13,elR:14,wrL:15,wrR:16,hipL:23,hipR:24,knL:25,knR:26,akL:27,akR:28};
+/* 二维角度：b 为顶点 */
+function ang(a,b,c){
+  const v1x=a.x-b.x,v1y=a.y-b.y,v2x=c.x-b.x,v2y=c.y-b.y;
+  const m1=Math.hypot(v1x,v1y),m2=Math.hypot(v2x,v2y);
+  if(m1<1e-6||m2<1e-6)return 180;
+  return Math.acos(Math.min(1,Math.max(-1,(v1x*v2x+v1y*v2y)/(m1*m2))))*180/Math.PI;
+}
+class BaseDetector{
+  constructor(){this.reset()}
+  reset(){this.state='待命';this.sm={};this.extra={}}
+  ema(k,v,a=0.45){const s=this.sm;k in s?s[k]=s[k]*(1-a)+v*a:s[k]=v;return s[k]}
+  out(state,metrics,progress,flash,hint){return {state,metrics,progress:Math.max(0,Math.min(1,progress||0)),flash:flash||null,hint:hint||null}}
+}
+const vis=(lm,i)=>lm[i]?lm[i].visibility:0;
+
+/* —— 引体向上：以双手腕线为"杠线"，下巴过线才算数，蹬腿借力判无效 —— */
+class PullUpDet extends BaseDetector{
+  constructor(){super();this.th=TH.pullup[strictLevel];this.attempt=null}
+  reset(){super.reset();this.attempt=null}
+  update(lm){
+    const th=this.th;
+    if(vis(lm,15)<0.35||vis(lm,16)<0.35||vis(lm,0)<0.4)
+      return this.out('待命',[['状态','双手/头部未同时入镜']],0,null,'请调整机位：双手握杠与头部需同框');
+    const wristY=(lm[15].y+lm[16].y)/2, nose=lm[0].y;
+    const elbow=Math.min(this.ema('eL',ang(lm[11],lm[13],lm[15])),this.ema('eR',ang(lm[12],lm[14],lm[16])));
+    const knee=Math.min(this.ema('kL',ang(lm[23],lm[25],lm[27])),this.ema('kR',ang(lm[24],lm[26],lm[28])));
+    const above=wristY-nose;                     // >0 头部高于杠线
+    const crossed=above>th.cross;
+    const hangPos=above<th.hangY&&elbow>th.hangE;
+    let flash=null,progress=0,stateTxt='';
+
+    if(this.state==='待命'||this.state==='悬挂就绪'){
+      if(hangPos)this.state='悬挂就绪';
+      if(this.state==='悬挂就绪'&&elbow<th.pullE){this.state='上拉中';this.attempt={crossed:false,minKnee:knee,minElbow:elbow};}
+      progress=0;stateTxt=this.state==='悬挂就绪'?'悬挂就绪，开始上拉':'等待悬挂就绪…';
+    }else if(this.state==='上拉中'){
+      const a=this.attempt;
+      a.minKnee=Math.min(a.minKnee,knee);a.minElbow=Math.min(a.minElbow,elbow);
+      if(crossed)a.crossed=true;
+      progress=(above-th.hangY)/(-th.hangY);
+      stateTxt=a.crossed?'已过杠，继续回落…':'上拉中，下巴未过杠';
+      if(above<th.downY&&elbow>th.downE){        // 回到悬挂，出手判定
+        this.state='悬挂就绪';this.attempt=null;
+        if(a.minElbow>th.ignoreE){/* 无有效动作，忽略 */}
+        else if(a.crossed&&a.minKnee>=th.knee)flash={kind:'valid',reason:'引体有效'};
+        else if(a.crossed)flash={kind:'invalid',reason:'蹬腿借力，无效'};
+        else flash={kind:'invalid',reason:'下巴未过杠，无效'};
+      }
+    }
+    return this.out(stateTxt,[
+      ['肘部角度',elbow.toFixed(0)+'°'],
+      ['膝角(借力监测)',knee.toFixed(0)+'°（低于 '+th.knee+'° 判借力）'],
+      ['过杠进度',(progress*100).toFixed(0)+'%']
+    ],progress,flash);
+  }
+}
+
+/* —— 仰卧起坐：躯干夹角判定，幅度不够判无效 —— */
+class SitUpDet extends BaseDetector{
+  constructor(){super();this.th=TH.situp[strictLevel]}
+  reset(){super.reset();this.reached=false}
+  update(lm){
+    const th=this.th;
+    const sideL=vis(lm,11)+vis(lm,23)+vis(lm,25), sideR=vis(lm,12)+vis(lm,24)+vis(lm,26);
+    const [sh,hip,kn]=sideL>=sideR?[11,23,25]:[12,24,26];
+    if(vis(lm,sh)<0.4||vis(lm,hip)<0.4||vis(lm,kn)<0.4)
+      return this.out('待命',[['状态','肩/髋/膝未同时入镜']],0,null,'请从侧面拍摄，确保肩、髋、膝在画面内');
+    const trunk=this.ema('t',ang(lm[sh],lm[hip],lm[kn]));
+    let flash=null,progress=0;
+    const isDown=trunk>=th.down, isUp=trunk<=th.up;
+    const denom=Math.max(1,th.down-th.up);
+    if(this.state==='待命'&&isDown)this.state='躺下就绪';
+    if(this.state==='躺下就绪'){
+      if(isUp){this.reached=true;this.state='抬起中'}
+      progress=(th.down-trunk)/denom;
+    }else if(this.state==='抬起中'){
+      if(isUp)this.reached=true;
+      progress=(th.down-trunk)/denom;
+      if(isDown){                                  // 回落到底，出手判定
+        if(this.reached)flash={kind:'valid',reason:'起坐到位，有效'};
+        else flash={kind:'invalid',reason:'起坐幅度不够，无效'};
+        this.reached=false;
+      }
+    }
+    return this.out(this.state==='待命'?'等待躺下就绪…':this.reached?'起坐到位，回落中':'动作中',[
+      ['躯干角(肩-髋-膝)',trunk.toFixed(0)+'°'],
+      ['达标线',`起坐 ≤${th.up}° / 躺平 ≥${th.down}°`],
+      ['幅度进度',(progress*100).toFixed(0)+'%']
+    ],progress,flash);
+  }
+}
+
+/* —— 深蹲：膝角深度 + 正面视角膝盖内扣监测 —— */
+class SquatDet extends BaseDetector{
+  constructor(){super();this.th=TH.squat[strictLevel]}
+  reset(){super.reset();this.bottom=false;this.dip=false;this.valgusAtBottom=false}
+  checkValgus(lm){
+    const th=this.th;
+    const mid=(lm[23].x+lm[24].x)/2;
+    if(Math.abs(lm[23].x-lm[24].x)<0.10)return false;   // 非正面视角不判内扣
+    for(const [hp,kn,ak] of [[23,25,27],[24,26,28]]){
+      if(vis(lm,hp)<0.55||vis(lm,kn)<0.55||vis(lm,ak)<0.55)continue;
+      const legMid=(lm[hp].x+lm[ak].x)/2;
+      const legRight=lm[hp].x>mid;                       // 该腿位于画面中线右侧
+      const inward=legRight?(legMid-lm[kn].x):(lm[kn].x-legMid);
+      if(inward>th.valgus)return true;
+    }
+    return false;
+  }
+  update(lm){
+    const th=this.th;
+    if(vis(lm,23)<0.5&&vis(lm,24)<0.5)
+      return this.out('待命',[['状态','髋部未入镜']],0,null,'请正对镜头，全身入镜');
+    const kL=vis(lm,25)>0.4?ang(lm[23],lm[25],lm[27]):null;
+    const kR=vis(lm,26)>0.4?ang(lm[24],lm[26],lm[28]):null;
+    let knee;
+    if(kL!=null&&kR!=null)knee=(kL+kR)/2;else knee=kL!=null?kL:(kR!=null?kR:180);
+    knee=this.ema('k',knee);
+    const span=Math.max(1,th.stand-th.deep);
+    const dipLine=(th.stand+th.deep)/2;
+    let flash=null,progress=(th.stand-knee)/span;
+    if(this.state==='待命'){if(knee>=th.stand)this.state='站立就绪';}
+    if(this.state==='站立就绪'){
+      if(knee<=th.deep){this.bottom=true;this.valgusAtBottom=this.checkValgus(lm);this.state='下蹲中'}
+      else if(knee<dipLine)this.dip=true;
+      progress=(th.stand-knee)/span;
+    }else if(this.state==='下蹲中'){
+      if(knee<th.deep)this.valgusAtBottom=this.valgusAtBottom||this.checkValgus(lm);
+      if(knee>=th.stand){
+        if(this.bottom&&this.valgusAtBottom)flash={kind:'invalid',reason:'膝盖内扣，无效'};
+        else if(this.bottom)flash={kind:'valid',reason:'深蹲到位，有效'};
+        else if(this.dip)flash={kind:'invalid',reason:'下蹲深度不够，无效'};
+        this.bottom=false;this.dip=false;this.valgusAtBottom=false;
+        this.state='站立就绪';
+      }
+    }
+    return this.out(this.state==='待命'?'等待站立就绪…':this.state==='下蹲中'?'下蹲中，请站直还原':'站立就绪，可下蹲',[
+      ['膝部角度',knee.toFixed(0)+'°'],
+      ['深度达标线',`膝角 ≤${th.deep}°`],
+      ['膝盖内扣监测',this.state==='下蹲中'?(this.valgusAtBottom?'检出内扣':'未见内扣'):'—']
+    ],progress,flash);
+  }
+}
+
+/* —— 俯卧撑：肘角深度 + 塌腰/撅臀监测 —— */
+class PushUpDet extends BaseDetector{
+  constructor(){super();this.th=TH.pushup[strictLevel]}
+  reset(){super.reset();this.bottom=false;this.dip=false;this.minBody=180}
+  update(lm){
+    const th=this.th;
+    const sideL=vis(lm,11)+vis(lm,23)+vis(lm,25), sideR=vis(lm,12)+vis(lm,24)+vis(lm,26);
+    const useL=sideL>=sideR;
+    const [sh,hip,kn]=useL?[11,23,25]:[12,24,26];
+    if(Math.abs(lm[11].y-lm[23].y)>0.24&&(vis(lm,11)>0.5&&vis(lm,23)>0.5))
+      return this.out('待命',[['状态','非侧面水平视角']],0,null,'请从侧面拍摄，让身体呈水平状态');
+    if(vis(lm,sh)<0.4||vis(lm,hip)<0.4)
+      return this.out('待命',[['状态','肩/髋未入镜']],0,null,'请从侧面拍摄，全身入镜');
+    const eL=vis(lm,13)>0.4&&vis(lm,15)>0.4?ang(lm[11],lm[13],lm[15]):null;
+    const eR=vis(lm,14)>0.4&&vis(lm,16)>0.4?ang(lm[12],lm[14],lm[16]):null;
+    let elbow=(eL!=null&&eR!=null)?Math.min(eL,eR):(eL!=null?eL:(eR!=null?eR:180));
+    elbow=this.ema('e',elbow);
+    const body=this.ema('b',ang(lm[sh],lm[hip],lm[kn]));
+    const span=Math.max(1,th.up-th.deep);
+    const dipLine=(th.up+th.deep)/2;
+    let flash=null,progress=(th.up-elbow)/span;
+    if(this.state==='待命'){if(elbow>=th.up&&body>th.body)this.state='支撑就绪';}
+    if(this.state==='支撑就绪'){
+      if(elbow<=th.deep){this.bottom=true;this.minBody=body;this.state='下放中'}
+      else if(elbow<dipLine)this.dip=true;
+      if(body<this.minBody)this.minBody=body;
+      progress=(th.up-elbow)/span;
+    }else if(this.state==='下放中'){
+      if(body<this.minBody)this.minBody=body;
+      if(elbow>=th.up){
+        if(this.minBody<th.body)flash={kind:'invalid',reason:'塌腰或撅臀，无效'};
+        else if(this.bottom)flash={kind:'valid',reason:'俯卧撑有效'};
+        else if(this.dip)flash={kind:'invalid',reason:'下放深度不够，无效'};
+        this.bottom=false;this.dip=false;this.minBody=180;
+        this.state='支撑就绪';
+      }
+    }
+    return this.out(this.state==='待命'?'等待支撑就绪…':this.state==='下放中'?'下放中，请撑直还原':'支撑就绪，可下放',[
+      ['肘部角度',elbow.toFixed(0)+'°'],
+      ['深度达标线',`肘角 ≤${th.deep}°`],
+      ['躯干直线度',`${body.toFixed(0)}°（塌腰阈值 ${th.body}°）`]
+    ],progress,flash);
+  }
+}
+const DETECTORS={pullup:PullUpDet,situp:SitUpDet,squat:SquatDet,pushup:PushUpDet};
+/*P3*/
+/* ================= 测试会话 ================= */
+const S={running:false,mode:'cam',ex:'pullup',planEx:'pullup',valid:0,invalid:0,t0:0,dur:0,timerId:null,det:null,stream:null,fileURL:null,fileName:''};
+let pose=null,loopId=null;
+function activeRules(){const u=activeUser();return u?initRulesIfEmpty(u.id):{}}
+
+function renderExChips(){
+  const box=$('#exChips');
+  box.innerHTML=Object.keys(EXERCISES).map(id=>`<button class="ex-chip ${id===S.ex?'active':''}" data-ex="${id}" ${S.running?'disabled':''}>${EXERCISES[id].name}</button>`).join('');
+  $('#shootTips').innerHTML=EXERCISES[S.ex].shoot+` <b>判定严格度（当前：${strictLevel==='loose'?'宽松':strictLevel==='std'?'标准':'严格'}）：</b>宽松=日常练习更友好，标准=常规体测口径，严格=裁判级从严（演示效果最佳），全程可切换。 <b>打分：</b>结束测试后按「当前生效的打分规则」自动计算得分，可选择保存为正式成绩（记录后固定不变）。`;
+  $$('#strictSeg button').forEach(x=>x.classList.toggle('active',x.dataset.s===strictLevel));
+}
+$('#exChips').addEventListener('click',e=>{
+  const b=e.target.closest('.ex-chip');if(!b||S.running)return;
+  S.ex=b.dataset.ex;renderExChips();
+  $('#durSel').value=S.ex==='situp'?'60':'0';
+});
+$('#planExChips').addEventListener('click',e=>{
+  const b=e.target.closest('.ex-chip');if(!b)return;
+  S.planEx=b.dataset.pex;renderPlan();
+});
+$('#planTarget').addEventListener('change',renderPlan);
+$('#strictSeg').addEventListener('click',e=>{
+  const b=e.target.closest('button[data-s]');if(!b||S.running)return;
+  strictLevel=b.dataset.s;localStorage.setItem('tzb_strict',strictLevel);
+  $$('#strictSeg button').forEach(x=>x.classList.toggle('active',x===b));
+  renderExChips();
+  toast('判定严格度已切换：'+STRICT_LABELS[strictLevel],'ok');
+});
+
+$('#modeSeg').addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b||S.running)return;
+  $$('#modeSeg button').forEach(x=>x.classList.toggle('active',x===b));
+  S.mode=b.dataset.mode;
+  const isFile=S.mode==='file';
+  $('#fileBtn').classList.toggle('hidden',!isFile);
+  $('#fileIn').classList.toggle('hidden',!isFile);
+  $('#camFace').classList.toggle('hidden',isFile);
+});
+$('#fileBtn').addEventListener('click',()=>$('#fileIn').click());
+$('#fileIn').addEventListener('change',()=>{if(S.mode==='file'&&$('#fileIn').files[0]&&!S.running)startSession()});
+$('#startBtn').addEventListener('click',startSession);
+$('#stopBtn').addEventListener('click',()=>finishSession(false));
+
+/* —— MediaPipe Pose —— */
+const POSE_CONN=[[0,1],[1,2],[2,3],[3,7],[0,4],[4,5],[5,6],[6,8],[9,10],[11,12],[11,13],[13,15],[15,17],[15,19],[15,21],[17,19],[12,14],[14,16],[16,18],[16,20],[16,22],[18,20],[11,23],[12,24],[23,24],[23,25],[24,26],[25,27],[26,28],[27,29],[28,30],[29,31],[30,32],[27,31],[28,32]];
+function getPose(){
+  if(pose)return pose;
+  if(typeof Pose==='undefined')return null;
+  pose=new Pose({locateFile:f=>`./${f}`});
+  const lite=matchMedia('(max-width:700px)').matches||/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
+  pose.setOptions({modelComplexity:lite?0:1,smoothLandmarks:true,enableSegmentation:false,minDetectionConfidence:0.5,minTrackingConfidence:0.5});
+  pose.onResults(handleResults);
+  return pose;
+}
+function drawSkeleton(lm){
+  const video=$('#video'),cv=$('#cv'),ctx=cv.getContext('2d');
+  if(video.videoWidth&&(cv.width!==video.videoWidth)){cv.width=video.videoWidth;cv.height=video.videoHeight}
+  ctx.clearRect(0,0,cv.width,cv.height);
+  if(!lm)return;
+  ctx.lineWidth=3;ctx.strokeStyle='rgba(126,178,239,.9)';
+  for(const [a,b] of POSE_CONN){
+    const p=lm[a],q=lm[b];if(!p||!q||p.visibility<0.5||q.visibility<0.5)continue;
+    ctx.beginPath();ctx.moveTo(p.x*cv.width,p.y*cv.height);ctx.lineTo(q.x*cv.width,q.y*cv.height);ctx.stroke();
+  }
+  ctx.fillStyle='#2F80ED';
+  for(const p of lm){if(!p||p.visibility<0.5)continue;ctx.beginPath();ctx.arc(p.x*cv.width,p.y*cv.height,4,0,Math.PI*2);ctx.fill()}
+}
+function doFlash(kind,text){
+  const f=$('#flash');f.className='flash '+kind;f.textContent=text;void f.offsetWidth;f.classList.add('show');
+}
+function addLog(kind,reason){
+  const list=$('#logList');const em=list.querySelector('.empty');if(em)em.remove();
+  const li=document.createElement('li');li.className=kind;
+  li.innerHTML=`<span class="t">${fmtDur((Date.now()-S.t0)/1000)}</span><span>${kind==='ok'?'✓':'✗'} ${esc(reason)}</span>`;
+  list.prepend(li);
+  while(list.children.length>30)list.lastChild.remove();
+}
+function handleResults(res){
+  if(!S.running)return;
+  const lm=res.pose_landmarks;
+  drawSkeleton(lm);
+  if(!lm)return;
+  const r=S.det.update(lm);
+  $('#metrics').innerHTML=r.metrics.map(m=>`<div class="m-row"><label>${esc(m[0])}</label><b>${esc(m[1])}</b></div>`).join('');
+  $('#progBar').style.width=(r.progress*100).toFixed(0)+'%';
+  $('#stateTxt').textContent=r.state;
+  if(r.hint){$('#stageHint').textContent=r.hint;$('#stageHint').classList.remove('hidden')}
+  else $('#stageHint').classList.add('hidden');
+  if(r.flash){
+    if(r.flash.kind==='valid'){
+      S.valid++;$('#validN').textContent=S.valid;
+      doFlash('ok','有效 +1');addLog('ok',r.flash.reason);say(r.flash.reason);
+    }else{
+      S.invalid++;$('#invalidN').textContent=S.invalid;
+      doFlash('bad','无效 · '+r.flash.reason);addLog('bad',r.flash.reason);say(r.flash.reason);
+    }
+  }
+}
+async function startSession(){
+  const u=activeUser();
+  if(!u){toast('请先创建/选择用户','bad');renderUsers();openModal('userModal');return}
+  if(S.running)return;
+  if(typeof Pose==='undefined'){toast('姿态引擎尚未加载完成（首次使用需联网加载），请稍候几秒再试','bad');return}
+  const ex=EXERCISES[S.ex];
+  S.valid=0;S.invalid=0;$('#validN').textContent='0';$('#invalidN').textContent='0';
+  $('#logList').innerHTML='<li class="empty">暂无判定记录</li>';
+  S.det=new DETECTORS[S.ex]();
+  S.dur=parseInt($('#durSel').value,10)||0;
+  const video=$('#video');
+  try{
+    if(S.mode==='cam'){
+      if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)throw new Error('no media');
+      const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:$('#camFace').value,width:{ideal:1280},height:{ideal:720}},audio:false});
+      S.stream=stream;video.srcObject=stream;$('#stage').classList.add('mirror');
+    }else{
+      const f=$('#fileIn').files[0];
+      if(!f){toast('请先选择视频文件','bad');$('#fileIn').click();return}
+      if(video.srcObject)video.srcObject=null;
+      if(!S.fileURL||S.fileName!==f.name){if(S.fileURL)URL.revokeObjectURL(S.fileURL);S.fileURL=URL.createObjectURL(f);S.fileName=f.name}
+      video.src=S.fileURL;$('#stage').classList.remove('mirror');
+    }
+    await video.play();
+  }catch(e){
+    toast(S.mode==='cam'?'无法打开摄像头：请允许权限、关闭其他占用摄像头的应用，并通过 localhost 或 https 访问本页':'视频无法播放：请更换常见格式（mp4/webm）','bad');
+    return;
+  }
+  S.running=true;S.t0=Date.now();
+  $('#stageIdle').classList.add('hidden');
+  $('#startBtn').classList.add('hidden');$('#stopBtn').classList.remove('hidden');
+  $$('#exChips .ex-chip').forEach(b=>b.disabled=true);
+  $('#modeSeg').style.pointerEvents='none';$('#strictSeg').style.pointerEvents='none';$('#durSel').disabled=true;$('#camFace').disabled=true;
+  toast(`开始测试：${ex.name}${S.dur?`（限时 ${S.dur} 秒）`:''}`,'ok');
+  S.timerId=setInterval(tick,250);tick();
+  getPose();
+  rafLoop();
+}
+function tick(){
+  const el=(Date.now()-S.t0)/1000,tEl=$('#timer');
+  if(S.dur>0){
+    const left=Math.max(0,S.dur-el);
+    tEl.textContent=fmtDur(left);tEl.classList.toggle('hot',left<=10&&left>0);
+    if(left<=0)finishSession(true);
+  }else{
+    tEl.textContent=fmtDur(el);tEl.classList.remove('hot');
+  }
+}
+async function rafLoop(){
+  if(!S.running)return;
+  const video=$('#video');
+  if(video.readyState>=2&&pose){try{await pose.send({image:video})}catch(e){}}
+  if(S.mode==='file'&&video.ended){finishSession(true);return}
+  loopId=requestAnimationFrame(rafLoop);
+}
+function finishSession(auto){
+  if(!S.running)return;
+  S.running=false;
+  clearInterval(S.timerId);
+  if(loopId)cancelAnimationFrame(loopId);
+  const video=$('#video');
+  if(S.stream){S.stream.getTracks().forEach(t=>t.stop());S.stream=null}
+  try{video.pause()}catch(e){}
+  video.srcObject=null;video.removeAttribute('src');try{video.load()}catch(e){}
+  $('#stageIdle').classList.remove('hidden');
+  $('#startBtn').classList.remove('hidden');$('#stopBtn').classList.add('hidden');
+  $$('#exChips .ex-chip').forEach(b=>b.disabled=false);
+  $('#modeSeg').style.pointerEvents='';$('#strictSeg').style.pointerEvents='';$('#durSel').disabled=false;$('#camFace').disabled=false;
+  drawSkeleton(null);
+  $('#metrics').innerHTML='<div class="m-row"><label>等待开始…</label><b>—</b></div>';
+  $('#progBar').style.width='0%';$('#stateTxt').textContent='—';
+  $('#stageHint').classList.add('hidden');
+  if(S.valid+S.invalid===0){
+    toast(auto?'分析完成：未检测到动作判定，请检查拍摄机位与光线':'未检测到动作判定，请调整机位、光线后重试','bad');
+    return;
+  }
+  if(auto&&S.dur>0)say(`时间到，有效${S.valid}次`);
+  showResult();
+}
+function showResult(){
+  const ex=EXERCISES[S.ex],rule=activeRules()[S.ex];
+  const score=calcScore(S.valid,rule.rows);
+  $('#resValid').textContent=S.valid;
+  $('#resInvalid').textContent=S.invalid;
+  $('#resExName').textContent=`${ex.name} · 有效次数`;
+  $('#resDur').textContent=fmtDur((Date.now()-S.t0)/1000);
+  $('#resScore').textContent=score;
+  $('#resRuleTxt').textContent=`按规则「${rule.name||'v'+rule.v}」（v${rule.v}）计算：${ruleSummary(rule.rows,ex.unit)}`;
+  $('#saveRecBtn').onclick=()=>{saveRecord(score);closeModal('resultModal')};
+  $('#practiceBtn').onclick=()=>{closeModal('resultModal');toast('本次为练习，未保存成绩')};
+  openModal('resultModal');
+}
+function saveRecord(score){
+  const u=activeUser();if(!u)return;
+  const rule=activeRules()[S.ex],ex=EXERCISES[S.ex];
+  const rec={id:uid(),ts:Date.now(),ex:S.ex,valid:S.valid,invalid:S.invalid,dur:Math.round((Date.now()-S.t0)/1000),score,ruleV:rule.v,ruleName:rule.name||'',ruleRows:rule.rows.map(r=>({...r}))};
+  const recs=store.records(u.id);recs.push(rec);store.saveRecords(u.id,recs);
+  toast(`已保存：${ex.name} ${S.valid}${ex.unit} = ${score} 分（规则 v${rule.v} 固定存档）`,'ok');
+  renderRecords();renderPlan();
+}
+
+/* ================= 测试记录页 ================= */
+function renderRecords(){
+  const u=activeUser(),box=$('#recTableBox'),stats=$('#statCards');
+  const sel=$('#recFilter'),prev=sel.value;
+  sel.innerHTML='<option value="">全部项目</option>'+Object.keys(EXERCISES).map(id=>`<option value="${id}" ${id===prev?'selected':''}>${EXERCISES[id].name}</option>`).join('');
+  if(!u){stats.innerHTML='';box.innerHTML='<div class="empty-box">请先创建用户</div>';$('#recCount').textContent='';return}
+  const recs=store.records(u.id).slice().sort((a,b)=>b.ts-a.ts);
+  const filtered=prev?recs.filter(r=>r.ex===prev):recs;
+  $('#recCount').textContent=`共 ${filtered.length} 条正式记录`;
+  const cards=[`<div class="stat"><label>累计正式测试</label><b>${recs.length}</b><small>次</small></div>`];
+  for(const exId of Object.keys(EXERCISES)){
+    const rs=recs.filter(r=>r.ex===exId);if(!rs.length)continue;
+    const best=rs.reduce((m,r)=>r.valid>m.valid?r:m,rs[0]);
+    const bestScore=rs.reduce((m,r)=>r.score>m.score?r:m,rs[0]);
+    cards.push(`<div class="stat"><label>${EXERCISES[exId].name} 最佳</label><b>${best.valid}${EXERCISES[exId].unit}</b><small>最高 ${bestScore.score} 分 · ${gradeOf(bestScore.score)}</small></div>`);
+  }
+  stats.innerHTML=cards.join('');
+  if(!filtered.length){
+    box.innerHTML='<div class="empty-box"><p>暂无成绩记录</p><p style="font-size:12px">完成一次测试并选择「保存为正式成绩」后，记录会固定保存在这里。</p></div>';
+    return;
+  }
+  box.innerHTML=`<table class="tb"><thead><tr><th>时间</th><th>项目</th><th>有效</th><th>无效</th><th>得分</th><th>计算规则（存档快照）</th><th></th></tr></thead><tbody>
+    ${filtered.map(r=>{
+      const ex=EXERCISES[r.ex]||{name:r.ex,unit:''};
+      const cls=r.score>=90?'s-hi':r.score>=60?'s-mid':r.score>0?'s-low':'s-zero';
+      return `<tr>
+        <td>${fmtTs(r.ts)}</td>
+        <td>${esc(ex.name)}</td>
+        <td><b>${r.valid}${esc(ex.unit)}</b></td>
+        <td>${r.invalid}</td>
+        <td class="score ${cls}">${r.score}分</td>
+        <td><span class="rule-tag">v${r.ruleV} ${esc(r.ruleName||'')}<br>${ruleSummary(r.ruleRows,ex.unit)}</span></td>
+        <td><button class="link-btn danger" data-del="${r.id}">删除</button></td>
+      </tr>`;
+    }).join('')}
+  </tbody></table>`;
+}
+$('#recTableBox').addEventListener('click',e=>{
+  const b=e.target.closest('[data-del]');if(!b)return;
+  const u=activeUser();if(!u)return;
+  const rec=store.records(u.id).find(r=>r.id===b.dataset.del);if(!rec)return;
+  const ex=EXERCISES[rec.ex]||{name:rec.ex};
+  confirmBox('删除成绩记录',`删除 ${fmtTs(rec.ts)} 的「${ex.name} ${rec.valid}次 = ${rec.score}分」记录？此操作不可恢复。`,'删除',()=>{
+    const left=store.records(u.id).filter(r=>r.id!==rec.id);
+    store.saveRecords(u.id,left);renderRecords();renderPlan();toast('已删除记录','ok');
+  });
+});
+$('#recFilter').addEventListener('change',renderRecords);
+$('#exportBtn').addEventListener('click',()=>{
+  const u=activeUser();if(!u){toast('请先创建用户','bad');return}
+  const recs=store.records(u.id).slice().sort((a,b)=>a.ts-b.ts);
+  if(!recs.length){toast('暂无记录可导出','bad');return}
+  const head=['时间','项目','有效次数','无效次数','用时(秒)','得分','规则版本','规则名称','规则内容'];
+  const lines=[head.join(',')].concat(recs.map(r=>{
+    const ex=EXERCISES[r.ex]||{name:r.ex,unit:''};
+    return [fmtTs(r.ts),ex.name,r.valid,r.invalid,r.dur,r.score,'v'+r.ruleV,r.ruleName||'',ruleSummary(r.ruleRows,ex.unit)].map(x=>`"${String(x).replace(/"/g,'""')}"`).join(',');
+  }));
+  const blob=new Blob(['\ufeff'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download=`体测成绩_${u.name}_${new Date().toISOString().slice(0,10)}.csv`;a.click();
+  toast('已导出 CSV','ok');
+});
+
+/* ================= 打分规则页 ================= */
+function curveSVG(rows){
+  const w=300,h=64,pad=6;
+  const maxMin=Math.max(...rows.map(r=>r.min),10);
+  const maxScore=Math.max(...rows.map(r=>r.score),100);
+  const pts=[];
+  for(let c=0;c<=maxMin+4;c++)pts.push(`${(pad+c/(maxMin+4)*(w-2*pad)).toFixed(1)},${(h-pad-calcScore(c,rows)/maxScore*(h-2*pad)).toFixed(1)}`);
+  return `<svg class="rc-curve" width="100%" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+    <polyline points="${pts.join(' ')}" fill="none" stroke="var(--pri)" stroke-width="2"/>
+    <text x="${pad}" y="${h-1}" font-size="9" fill="var(--sub)">0 次</text>
+    <text x="${w-pad}" y="${h-1}" font-size="9" fill="var(--sub)" text-anchor="end">次数 →</text>
+    <text x="${pad}" y="${pad+8}" font-size="9" fill="var(--sub)">满分 ${maxScore} 分</text>
+  </svg>`;
+}
+function renderRuleCards(){
+  const u=activeUser(),box=$('#ruleCards');
+  if(!u){box.innerHTML='<div class="empty-box">请先创建用户</div>';return}
+  const rules=activeRules();
+  box.innerHTML=Object.keys(EXERCISES).map(exId=>{
+    const ex=EXERCISES[exId],r=rules[exId];
+    const hist=(r.history||[]).slice().reverse();
+    return `<div class="card rule-card">
+      <div class="rc-head"><b>${ex.name}</b><span class="v-badge">v${r.v} 生效中</span></div>
+      <div class="rc-time">规则：${esc(r.name||'v'+r.v)} · 更新于 ${fmtTs(r.updatedAt)}</div>
+      <div class="rc-rows">${[...r.rows].sort((a,b)=>a.min-b.min).map(x=>`<div><span>≥ ${x.min} ${ex.unit}</span><b>${x.score} 分</b></div>`).join('')}</div>
+      ${curveSVG(r.rows)}
+      <div class="rc-foot"><button class="btn small" data-edit="${exId}">编辑规则</button><span style="font-size:11px;color:var(--sub)">历史成绩按当时规则固定，不受新版本影响</span></div>
+      ${hist.length?`<details class="hist"><summary>历史版本（${hist.length}）— 可恢复</summary><ul>${hist.map(h=>`<li><b>v${h.v}</b><span>${esc(h.name||'')} · ${fmtTs(h.updatedAt)}</span><span style="flex:1"></span><button class="link-btn" data-restore="${exId}" data-v="${h.v}">恢复此版本</button></li>`).join('')}</ul></details>`:''}
+    </div>`;
+  }).join('');
+}
+$('#ruleCards').addEventListener('click',e=>{
+  const ed=e.target.closest('[data-edit]');if(ed){openRuleModal(ed.dataset.edit);return}
+  const rs=e.target.closest('[data-restore]');
+  if(rs){
+    const exId=rs.dataset.restore,v=parseInt(rs.dataset.v,10);
+    const rules=activeRules(),r=rules[exId];
+    const h=(r.history||[]).find(x=>x.v===v);if(!h)return;
+    r.history=r.history||[];
+    r.history.push({v:r.v,name:r.name,updatedAt:r.updatedAt,rows:r.rows.map(x=>({...x}))});
+    if(r.history.length>12)r.history=r.history.slice(-12);
+    r.rows=h.rows.map(x=>({...x}));
+    r.name=(h.name||'')?h.name+`（恢复自v${h.v}）`:`恢复自v${h.v}`;
+    r.updatedAt=Date.now();
+    r.v=Math.max(r.v,...r.history.map(x=>x.v))+1;
+    store.saveRules(activeUser().id,rules);
+    renderRuleCards();toast(`已将 v${h.v} 的内容恢复为当前生效版本 v${r.v}（历史成绩不受影响）`,'ok');
+  }
+});
+
+let editingEx=null;
+function openRuleModal(exId){
+  editingEx=exId;
+  const rules=activeRules(),r=rules[exId],ex=EXERCISES[exId];
+  $('#ruleModalTitle').textContent=`编辑打分规则 · ${ex.name}`;
+  $('#ruleNameIn').value=r.name||'';
+  $('#presetRow').innerHTML=EX_PRESETS[exId].map(k=>`<button class="btn small" data-preset="${k}">${PRESETS[k].label}</button>`).join('')+`<span style="font-size:11px;color:var(--sub);align-self:center">${STD_NOTE[exId]?'预设来源：国标 2014':'预设为通用训练参考'}</span>`;
+  renderRowsEditor(r.rows);
+  $('#ruleErr').classList.add('hidden');
+  openModal('ruleModal');
+}
+function renderRowsEditor(rows){
+  $('#rowsEditorBody').innerHTML=[...rows].sort((a,b)=>a.min-b.min).map(r=>`
+    <div class="re-row">
+      <span><input type="number" min="0" step="1" value="${r.min}" data-f="min"></span>
+      <span><input type="number" min="0" max="120" step="1" value="${r.score}" data-f="score"></span>
+      <button class="del" title="删除该档">✕</button>
+    </div>`).join('');
+}
+$('#presetRow').addEventListener('click',e=>{
+  const b=e.target.closest('[data-preset]');if(!b)return;
+  renderRowsEditor(PRESETS[b.dataset.preset].rows);
+});
+$('#rowsEditorBody').addEventListener('click',e=>{
+  const b=e.target.closest('.del');if(!b)return;
+  const rows=$$('#rowsEditorBody .re-row');
+  if(rows.length<=1){toast('至少保留一档','bad');return}
+  b.closest('.re-row').remove();
+});
+$('#addRowBtn').addEventListener('click',()=>{
+  const last=$$('#rowsEditorBody .re-row').pop();
+  let min=0,score=60;
+  if(last){
+    min=(parseInt(last.querySelector('[data-f=min]').value,10)||0)+5;
+    score=Math.max(0,(parseInt(last.querySelector('[data-f=score]').value,10)||60)-10);
+  }
+  const div=document.createElement('div');div.className='re-row';
+  div.innerHTML=`<span><input type="number" min="0" step="1" value="${min}" data-f="min"></span><span><input type="number" min="0" max="120" step="1" value="${score}" data-f="score"></span><button class="del" title="删除该档">✕</button>`;
+  $('#rowsEditorBody').appendChild(div);
+});
+$('#saveRuleBtn').addEventListener('click',()=>{
+  const exId=editingEx;if(!exId)return;
+  const rows=[];
+  for(const row of $$('#rowsEditorBody .re-row')){
+    const minIn=row.querySelector('[data-f=min]'),scoreIn=row.querySelector('[data-f=score]');
+    const min=parseInt(minIn.value,10),score=parseInt(scoreIn.value,10);
+    if(isNaN(min)||isNaN(score)){showRuleErr('每一档的「最低个数」和「得分」都必须填写整数');return}
+    if(min<0||score<0||score>120){showRuleErr('个数不能为负，得分范围 0~120 分');return}
+    rows.push({min,score});
+  }
+  if(!rows.length){showRuleErr('请至少设置一档对照');return}
+  rows.sort((a,b)=>a.min-b.min);
+  const mins=rows.map(r=>r.min);
+  if(new Set(mins).size!==mins.length){showRuleErr('「最低个数」不能重复');return}
+  const rules=activeRules(),r=rules[exId];
+  const same=rows.length===r.rows.length&&rows.every((x,i)=>x.min===r.rows[i].min&&x.score===r.rows[i].score);
+  if(same){showRuleErr('对照表与当前版本完全相同，未生成新版本');return}
+  r.history=r.history||[];
+  r.history.push({v:r.v,name:r.name,updatedAt:r.updatedAt,rows:r.rows.map(x=>({...x}))});
+  if(r.history.length>12)r.history=r.history.slice(-12);
+  const nameIn=$('#ruleNameIn').value.trim();
+  r.rows=rows;
+  r.name=nameIn||`v${r.v+1}`;
+  r.updatedAt=Date.now();
+  r.v=Math.max(r.v,...r.history.map(x=>x.v))+1;
+  store.saveRules(activeUser().id,rules);
+  closeModal('ruleModal');
+  renderRuleCards();
+  toast(`规则已更新为 v${r.v}（${EXERCISES[exId].name}），下次测试按新规则打分，历史成绩不变`,'ok');
+});
+function showRuleErr(msg){const el=$('#ruleErr');el.textContent=msg;el.classList.remove('hidden')}
+
+/* ================= 训练计划页 ================= */
+const PLAN_TIPS={
+  pullup:['弹力带辅助引体 4 组 × 8 次，幅度做满（下巴过杠再下放）','离心下放：跳上杠后 5 秒缓慢下落，5 次 × 4 组','标准引体 5 组 ×（力竭次数的 60%），组间休息 2 分钟','模拟测试：完整做一组计时引体，对照评分表检验 4 周成果'],
+  situp:['仰卧卷腹 3 组 × 20 次，用腹部发力，避免颈部代偿','半程定向练习：肘碰膝 4 组 × 15 次','完整仰卧起坐 4 组 × 力竭次数的 70%，组间休息 90 秒','计时模拟：60 秒全力测试，对照评分表看差距'],
+  squat:['徒手深蹲 3 组 × 15 次，对镜检查膝盖方向（不内扣）','箱式深蹲（坐凳起立）4 组 × 10 次，强化底部深度',' deepen：深蹲保持 3 组 × 30 秒 + 跳跃深蹲 3 组 × 6 次','模拟测试：连续 30 个标准深蹲计时，检查每个动作有效性'],
+  pushup:['跪姿俯卧撑 3 组 × 12 次，保持躯干平直不塌腰','标准俯卧撑离心下放（3 秒下放）4 组 × 6 次','标准俯卧撑 5 组 × 力竭次数的 70%，组间休息 90 秒','模拟测试：连续标准俯卧撑计时计数，检查塌腰与深度']
+};
+function renderPlan(){
+  const u=activeUser(),box=$('#planBox');
+  $('#planExChips').innerHTML=Object.keys(EXERCISES).map(id=>`<button class="ex-chip ${id===S.planEx?'active':''}" data-pex="${id}">${EXERCISES[id].name}</button>`).join('');
+  if(!u){box.innerHTML='<div class="empty-box">请先创建用户</div>';$('#planTarget').innerHTML='';return}
+  const ex=EXERCISES[S.planEx],rule=activeRules()[S.planEx];
+  const opts=[...rule.rows].filter(r=>r.score>=60).sort((a,b)=>a.score-b.score);
+  const sel=$('#planTarget'),prev=parseInt(sel.value,10)||0;
+  sel.innerHTML=opts.map(r=>`<option value="${r.score}">${r.score} 分（需 ${r.min} ${ex.unit}）</option>`).join('');
+  const tgt=opts.find(o=>o.score===prev)||opts[opts.length-1];
+  if(tgt)sel.value=tgt.score;
+  const recs=store.records(u.id).filter(r=>r.ex===S.planEx).sort((a,b)=>b.ts-a.ts);
+  if(!recs.length){
+    box.innerHTML=`<div class="empty-box"><p>还没有「${ex.name}」的正式成绩</p><p style="font-size:12px">先完成一次测试并保存，4 周计划将按你的有效次数自动生成；每次复测后自动调整。</p></div>`;
+    return;
+  }
+  if(!tgt){box.innerHTML='<div class="empty-box">当前规则未设置 ≥60 分的档位，请先到「打分规则」中设定</div>';return}
+  const latest=recs[0],cur=latest.valid;
+  if(cur>=tgt.min){
+    box.innerHTML=`<h3>达标状态 · ${ex.name}</h3>
+      <p style="font-size:15px;font-weight:700;color:var(--ok);margin:6px 0 12px">已达标：最近成绩 ${cur}${ex.unit} ≥ 目标 ${tgt.min}${ex.unit}（${tgt.score} 分）</p>
+      <table class="tb"><thead><tr><th>周次</th><th>安排</th></tr></thead><tbody>
+      <tr><td class="plan-week">每周</td><td style="text-align:left">保持训练 2 次 ×（当前次数的 70%），每周 1 次完整模拟测试防止状态下滑</td></tr>
+      <tr><td class="plan-week">冲刺</td><td style="text-align:left">想冲击更高档位？在上方切换更高的目标分数，计划会重新生成</td></tr>
+      </tbody></table>
+      <p class="plan-note">成绩记录固定不变；继续刷新个人最好成绩会显示在「测试记录」页。</p>`;
+    return;
+  }
+  const targets=[];let v=cur;
+  for(let i=1;i<=4;i++){v=Math.max(v+1,Math.round(cur+(tgt.min-cur)*i/4));targets.push(v)}
+  targets[3]=tgt.min;
+  box.innerHTML=`<h3>4 周达标计划 · ${ex.name}</h3>
+    <p style="margin-bottom:10px;font-size:13px">最近成绩：<b>${cur}${ex.unit}</b>（${fmtTs(latest.ts)}，按规则 v${latest.ruleV} 得 ${latest.score} 分）→ 目标：<b>${tgt.score} 分 = ${tgt.min}${ex.unit}</b></p>
+    <table class="tb"><thead><tr><th>周次</th><th>目标有效次数</th><th>训练建议</th></tr></thead><tbody>
+    ${targets.map((t,i)=>`<tr><td class="plan-week">第 ${i+1} 周</td><td><b>${t}${ex.unit}</b></td><td style="text-align:left">${PLAN_TIPS[S.planEx][i]}</td></tr>`).join('')}
+    </tbody></table>
+    <p class="plan-note">每次复测保存成绩后回到本页，计划按最新有效次数自动调整；无效动作不计入成绩——先纠正动作质量，再冲数量。${STD_NOTE[S.planEx]?'<br>'+STD_NOTE[S.planEx]:''}</p>`;
+}
+
+/* ================= 页签与初始化 ================= */
+$('#tabs').addEventListener('click',e=>{
+  const b=e.target.closest('button[data-tab]');if(!b)return;
+  $$('#tabs button').forEach(x=>x.classList.toggle('active',x===b));
+  $$('.tab').forEach(t=>t.classList.toggle('active',t.id==='tab-'+b.dataset.tab));
+  if(b.dataset.tab==='records')renderRecords();
+  if(b.dataset.tab==='rules')renderRuleCards();
+  if(b.dataset.tab==='plan')renderPlan();
+});
+
+renderExChips();
+afterUserSwitch();
+if(!store.users().length){
+  $('#userModalNote').classList.remove('hidden');
+  renderUsers();openModal('userModal');
+}
+/*P4*/
+</script>
+</body>
+</html>
