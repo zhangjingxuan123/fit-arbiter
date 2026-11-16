@@ -5,7 +5,13 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>体测仲裁教练 · 有效次数判定与打分</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232F80ED' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='12' cy='5' r='2.2'/%3E%3Cpath d='M12 7.5v5M12 12.5l-4.5 3M12 12.5l4.5 3M7.5 15.5l-1.5 4M16.5 15.5l1.5 4'/%3E%3C/svg%3E">
-<script src="pose.js" defer></script>
+<script>
+/* Pose 引擎加载器：优先国内镜像，失败自动回退 jsdelivr */
+window.POSE_READY=false;
+window.POSE_SCRIPTS=['https://registry.npmmirror.com/@mediapipe/pose/0.5.1675469404/files/pose.js','pose.js'];
+!function(){function done(){window.POSE_READY=true;var e=document.createEvent('Event');e.initEvent('poseready',true,true);document.dispatchEvent(e);if(window.__onPoseReady)try{window.__onPoseReady()}catch(x){}}
+function ld(i){if(i>=window.POSE_SCRIPTS.length)return;var s=document.createElement('script');s.onload=done;s.onerror=function(){ld(i+1)};s.src=window.POSE_SCRIPTS[i];document.head.appendChild(s)}ld(0)}();
+</script>
 <style>
 :root{
   --bg:#F4F8FC; --card:#FFFFFF; --line:#DCE8F5; --line2:#C7DAEF;
@@ -83,6 +89,9 @@ main{max-width:1200px;margin:0 auto;padding:12px 16px 40px}
 .spacer{flex:1}
 .timer{font-variant-numeric:tabular-nums;font-size:18px;font-weight:700;color:var(--pri);letter-spacing:1px}
 .timer.hot{color:var(--bad)}
+.eng-stat{font-size:12px;color:var(--warn);white-space:nowrap}
+.eng-stat.on{color:var(--ok)}
+.stage-err{position:absolute;top:12px;left:12px;right:12px;padding:10px 12px;border-radius:8px;background:rgba(178,44,48,.94);color:#fff;font-size:12px;line-height:1.7;z-index:5}
 
 .btn{padding:7px 16px;border-radius:9px;background:var(--pri);color:#fff;font-weight:600;font-size:13px}
 .btn:hover{background:var(--pri-d)}
@@ -305,6 +314,7 @@ footer{max-width:1200px;margin:0 auto;padding:0 16px 24px;font-size:11px;color:#
           <input type="file" id="fileIn" accept="video/*" class="hidden">
           <button id="fileBtn" class="btn ghost small hidden">选择视频文件</button>
           <span class="spacer"></span>
+          <span id="engineStat" class="eng-stat">引擎加载中…</span>
           <span id="timer" class="timer">00:00</span>
           <button id="startBtn" class="btn">开始测试</button>
           <button id="stopBtn" class="btn danger hidden">结束测试</button>
@@ -799,7 +809,7 @@ const DETECTORS={pullup:PullUpDet,situp:SitUpDet,squat:SquatDet,pushup:PushUpDet
 /*P3*/
 /* ================= 测试会话 ================= */
 const S={running:false,mode:'cam',ex:'pullup',planEx:'pullup',valid:0,invalid:0,t0:0,dur:0,timerId:null,det:null,stream:null,fileURL:null,fileName:''};
-let pose=null,loopId=null;
+let POSE_BASE=null,pose=null,loopId=null;
 function activeRules(){const u=activeUser();return u?initRulesIfEmpty(u.id):{}}
 
 function renderExChips(){
@@ -842,20 +852,35 @@ $('#stopBtn').addEventListener('click',()=>finishSession(false));
 
 /* —— MediaPipe Pose —— */
 const POSE_CONN=[[0,1],[1,2],[2,3],[3,7],[0,4],[4,5],[5,6],[6,8],[9,10],[11,12],[11,13],[13,15],[15,17],[15,19],[15,21],[17,19],[12,14],[14,16],[16,18],[16,20],[16,22],[18,20],[11,23],[12,24],[23,24],[23,25],[24,26],[25,27],[26,28],[27,29],[28,30],[29,31],[30,32],[27,31],[28,32]];
+async function pickPoseBase(){
+  if(POSE_BASE)return POSE_BASE;
+  const bases=['https://registry.npmmirror.com/@mediapipe/pose/0.5.1675469404/files/','./'];
+  for(const b of bases){
+    try{const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),6000);
+      const r=await fetch(b+'pose_landmark_lite.tflite',{signal:ctl.signal,cache:'force-cache'});
+      clearTimeout(to);if(r.ok){POSE_BASE=b;return b}}catch(e){}
+  }
+  POSE_BASE=bases[0];return POSE_BASE;
+}
 function getPose(){
   if(pose)return pose;
   if(typeof Pose==='undefined')return null;
-  pose=new Pose({locateFile:f=>`./${f}`});
-  const lite=matchMedia('(max-width:700px)').matches||/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
-  pose.setOptions({modelComplexity:lite?0:1,smoothLandmarks:true,enableSegmentation:false,minDetectionConfidence:0.5,minTrackingConfidence:0.5});
-  pose.onResults(handleResults);
-  return pose;
+  return (async()=>{
+    const base=await pickPoseBase();
+    pose=new Pose({locateFile:f=>base+f});
+    pose.setOptions({modelComplexity:0,smoothLandmarks:true,enableSegmentation:false,minDetectionConfidence:0.5,minTrackingConfidence:0.5});
+    pose.onResults(handleResults);
+    return pose;
+  })();
 }
 function drawSkeleton(lm){
   const video=$('#video'),cv=$('#cv'),ctx=cv.getContext('2d');
   if(video.videoWidth&&(cv.width!==video.videoWidth)){cv.width=video.videoWidth;cv.height=video.videoHeight}
   ctx.clearRect(0,0,cv.width,cv.height);
-  if(!lm)return;
+  if(!lm){
+    $('#stateTxt').textContent='未检测到人体，请确保全身在画面内且光线充足';
+    return;
+  }
   ctx.lineWidth=3;ctx.strokeStyle='rgba(126,178,239,.9)';
   for(const [a,b] of POSE_CONN){
     const p=lm[a],q=lm[b];if(!p||!q||p.visibility<0.5||q.visibility<0.5)continue;
@@ -899,7 +924,11 @@ async function startSession(){
   const u=activeUser();
   if(!u){toast('请先创建/选择用户','bad');renderUsers();openModal('userModal');return}
   if(S.running)return;
-  if(typeof Pose==='undefined'){toast('姿态引擎尚未加载完成（首次使用需联网加载），请稍候几秒再试','bad');return}
+  if(typeof Pose==='undefined'){
+    toast('姿态引擎仍在下载（首次约需 10~30 秒），状态灯变绿后即可开始','bad');
+    try{await new Promise(res=>{const to=setTimeout(res,90000);document.addEventListener('poseready',()=>{clearTimeout(to);res()},{once:true})})}catch(e){}
+    if(typeof Pose==='undefined'){toast('引擎加载失败：请检查网络后在网络较好的环境重试','bad');return}
+  }
   const ex=EXERCISES[S.ex];
   S.valid=0;S.invalid=0;$('#validN').textContent='0';$('#invalidN').textContent='0';
   $('#logList').innerHTML='<li class="empty">暂无判定记录</li>';
@@ -920,17 +949,26 @@ async function startSession(){
     }
     await video.play();
   }catch(e){
-    toast(S.mode==='cam'?'无法打开摄像头：请允许权限、关闭其他占用摄像头的应用，并通过 localhost 或 https 访问本页':'视频无法播放：请更换常见格式（mp4/webm）','bad');
+    hideStageErr();
+    const name=e&&e.name||'';
+    let msg='摄像头打开失败';
+    if(name==='NotAllowedError')msg='摄像头权限被拒绝：请点击浏览器地址栏左端的相机图标 → 允许，再点开始。若是在微信/QQ里打开，请先点右上角「…」→ 用系统浏览器打开（iPhone用Safari，安卓用Chrome）';
+    else if(name==='NotFoundError')msg='未检测到摄像头设备';
+    else if(name==='NotReadableError')msg='摄像头被其他应用占用，请关闭其他使用摄像头的软件后重试';
+    else if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)msg='当前浏览器不支持摄像头调用：请改用 Safari（iPhone）或 Chrome/Edge（安卓/电脑）打开本页';
+    showStageErr(msg);
+    toast(S.mode==='cam'?'摄像头打开失败，请看画面上的提示':'视频无法播放：请更换常见格式（mp4/webm）','bad');
     return;
   }
   S.running=true;S.t0=Date.now();
+  hideStageErr();
   $('#stageIdle').classList.add('hidden');
   $('#startBtn').classList.add('hidden');$('#stopBtn').classList.remove('hidden');
   $$('#exChips .ex-chip').forEach(b=>b.disabled=true);
   $('#modeSeg').style.pointerEvents='none';$('#strictSeg').style.pointerEvents='none';$('#durSel').disabled=true;$('#camFace').disabled=true;
   toast(`开始测试：${ex.name}${S.dur?`（限时 ${S.dur} 秒）`:''}`,'ok');
   S.timerId=setInterval(tick,250);tick();
-  getPose();
+  await getPose();
   rafLoop();
 }
 function tick(){
@@ -1235,6 +1273,12 @@ $('#tabs').addEventListener('click',e=>{
   if(b.dataset.tab==='rules')renderRuleCards();
   if(b.dataset.tab==='plan')renderPlan();
 });
+
+function showStageErr(msg){const old=$('#stageErr');if(old)old.remove();const d=document.createElement('div');d.id='stageErr';d.className='stage-err';d.textContent=msg;$('#stage').appendChild(d)}
+function hideStageErr(){const d=$('#stageErr');if(d)d.remove()}
+
+/* 引擎状态灯轮询 */
+setInterval(()=>{const el=$('#engineStat');if(!el)return;const r=!!window.POSE_READY;el.textContent=r?'引擎就绪':'引擎加载中…';el.classList.toggle('on',r)},700);
 
 renderExChips();
 afterUserSwitch();
