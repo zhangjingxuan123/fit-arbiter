@@ -1,0 +1,16 @@
+{
+  "name": "体测仲裁教练 · 离线判定与仲裁",
+  "short_name": "体测仲裁",
+  "description": "离线优先的手机端 AI 体测判定与仲裁系统：机器逐次判定、证据可回放、成绩带签名",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F4F8FC",
+  "theme_color": "#2F80ED",
+  "lang": "zh-CN",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}
