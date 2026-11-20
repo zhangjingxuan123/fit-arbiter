@@ -1,11 +1,12 @@
 /* 体测仲裁教练 v2 · Service Worker：首次安装预缓存引擎，此后判定/计分/签名/导出全程离线 */
-const V='tzb2-2026-11-20c';
+const V='tzb2-2026-11-20d';
 const ORIGIN=location.origin;
 const PRECACHE=[
   './','manifest.json','icon-192.png','icon-512.png',
-  'pose.js','qrcode.js','jsQR.js','pose_landmark_lite.tflite',
-  'https://registry.npmmirror.com/@mediapipe/pose/0.5.1675469404/files/pose.js',
-  'https://registry.npmmirror.com/@mediapipe/pose/0.5.1675469404/files/pose_landmark_lite.tflite',
+  'qrcode.js','jsQR.js',
+  'vision_bundle.mjs','vision_wasm_internal.js','vision_wasm_internal.wasm',
+  'vision_wasm_nosimd_internal.js','vision_wasm_nosimd_internal.wasm',
+  'pose_landmarker.task',
   'https://registry.npmmirror.com/qrcode-generator/1.4.4/files/qrcode.js',
   'https://registry.npmmirror.com/jsqr/1.4.0/files/dist/jsQR.js'
 ];

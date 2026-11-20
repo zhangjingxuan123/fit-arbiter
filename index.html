@@ -8,16 +8,31 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232F80ED' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='12' cy='5' r='2.2'/%3E%3Cpath d='M12 7.5v5M12 12.5l-4.5 3M12 12.5l4.5 3M7.5 15.5l-1.5 4M16.5 15.5l1.5 4'/%3E%3C/svg%3E">
 <script>
-/* 外部引擎加载器：国内镜像优先，jsdelivr 兜底；加载即进入 HTTP 缓存，断网后仍可用 */
+/* 外部引擎加载器：本地资源最先（部署版自带），再走国内镜像，最后 jsdelivr 兜底 */
 window.POSE_READY=false;
-/* 同目录本地资源最先尝试（部署版自带），再走国内镜像，最后 jsdelivr 兜底 */
-window.POSE_SCRIPTS=['pose.js','https://registry.npmmirror.com/@mediapipe/pose/0.5.1675469404/files/pose.js','https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js'];
+/* 新引擎：MediaPipe Tasks Vision（PoseLandmarker），真机/桌面验证充分 */
+window.TASKS_SCRIPTS=['vision_bundle.mjs','https://registry.npmmirror.com/@mediapipe/tasks-vision/0.10.14/files/vision_bundle.mjs','https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs'];
+window.TASKS_BASE=['./','https://registry.npmmirror.com/@mediapipe/tasks-vision/0.10.14/files/wasm/','https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm/'];
+/* 模型基址：本地放 pose_landmarker.task，其次 hf-mirror */
+window.MODEL_URLS=['pose_landmarker.task','https://hf-mirror.com/DeveloperDobby/mediapipe-pose-landmarker-full/resolve/main/pose_landmarker_full.task'];
 window.QRGEN_SCRIPTS=['qrcode.js','https://registry.npmmirror.com/qrcode-generator/1.4.4/files/qrcode.js','https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js'];
 window.JSQR_SCRIPTS=['jsQR.js','https://registry.npmmirror.com/jsqr/1.4.0/files/dist/jsQR.js','https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js'];
-function __ldone(flag){window[flag]=true;document.dispatchEvent(new Event(flag==='POSE_READY'?'poseready':'libready'))}
+function __ldone(flag){window[flag]=true;document.dispatchEvent(new Event('poseready'))}
 function __ld(i,list,flag){if(i>=list.length)return;var s=document.createElement('script');s.onload=function(){__ldone(flag)};s.onerror=function(){__ld(i+1,list,flag)};s.src=list[i];document.head.appendChild(s)}
-__ld(0,window.POSE_SCRIPTS,'POSE_READY');
-window.loadLib=function(flag,list){return new Promise(res=>{if(window[flag])return res(true);if(window[flag]===null)return res(false);var s=document.createElement('script');s.onload=function(){window[flag]=true;res(true)};s.onerror=function(){window[flag]=null;res(false)};s.src=list[0];document.head.appendChild(s)})};
+/* vision_bundle.mjs 是 ES 模块：动态 import，拿到 PoseLandmarker 与 FilesetResolver */
+(function(){
+  const tryImport=async i=>{
+    if(i>=window.TASKS_SCRIPTS.length)return;
+    try{
+      const m=await import(window.TASKS_SCRIPTS[i]);
+      window.PoseLandmarker=m.PoseLandmarker;
+      window.FilesetResolver=m.FilesetResolver;
+      __ldone('POSE_READY');
+    }catch(e){tryImport(i+1)}
+  };
+  tryImport(0);
+})();
+window.loadLibChain=function(urls){return new Promise(res=>{const go=i=>{if(i>=urls.length)return res(false);const s=document.createElement('script');s.onload=()=>res(true);s.onerror=()=>go(i+1);s.src=urls[i];document.head.appendChild(s)};go(0)})};
 </script>
 <style>
 :root{
@@ -98,9 +113,15 @@ main{max-width:1200px;margin:0 auto;padding:12px 16px 40px}
 .assist-bar b{font-variant-numeric:tabular-nums}
 .assist-bar button{padding:4px 12px;border-radius:8px;background:rgba(255,255,255,.92);color:var(--warn);font-weight:700;font-size:13px}
 
-/* ===== 摆机四检 + 准备流程 ===== */
-.prepare{position:absolute;inset:0;z-index:8;background:rgba(10,20,36,.9);backdrop-filter:blur(4px);color:#E7EFF9;display:flex;flex-direction:column}
-.prep-head{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.12)}
+/* ===== 摆机四检 + 准备流程（底部半透明面板：不挡画面，骨架可见） ===== */
+.prepare{position:absolute;left:0;right:0;bottom:0;z-index:8;max-height:56%;
+  background:linear-gradient(180deg,rgba(10,20,36,.55),rgba(10,20,36,.88));
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  color:#E7EFF9;display:flex;flex-direction:column;
+  border-radius:18px 18px 0 0;border-top:1px solid rgba(255,255,255,.18);
+  box-shadow:0 -6px 24px rgba(0,0,0,.35)}
+@media (max-width:640px){.prepare{max-height:62%}}
+.prep-head{display:flex;align-items:center;gap:10px;padding:10px 14px 6px;border-bottom:1px solid rgba(255,255,255,.10)}
 .prep-head b{font-size:14px}
 .prep-head .steps{flex:1;display:flex;gap:6px;justify-content:center}
 .pstep{font-size:11px;padding:3px 9px;border-radius:12px;background:rgba(255,255,255,.1);color:#9FB6D4;white-space:nowrap}
@@ -108,7 +129,7 @@ main{max-width:1200px;margin:0 auto;padding:12px 16px 40px}
 .pstep.done{background:rgba(30,158,90,.25);color:#8FE0B2}
 .prep-close{width:30px;height:30px;border-radius:8px;color:#9FB6D4;font-size:15px}
 .prep-close:hover{background:rgba(255,255,255,.12)}
-.prep-body{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
+.prep-body{flex:1;overflow-y:auto;padding:10px 14px 14px;display:flex;flex-direction:column;gap:10px}
 .prep-body.center{align-items:center;justify-content:center;text-align:center}
 .checks{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 @media (max-width:640px){.checks{grid-template-columns:1fr}}
@@ -395,8 +416,62 @@ footer .link-btn{font-size:11px}
   .rl-frame{max-width:100%}
 }
 </style>
+<style>
+/* ===== 微信/QQ 内置浏览器引导 ===== */
+.wxtip{position:fixed;inset:0;z-index:200;background:rgba(8,16,30,.97);color:#E7EFF9;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center}
+.wxtip h2{font-size:20px;margin-bottom:2px}
+.wxtip .arrow{font-size:30px;line-height:1}
+.wxtip ol{text-align:left;font-size:14px;line-height:2.1;color:#CFE2F8;padding-left:22px;max-width:340px}
+.wxtip ol b{color:#fff}
+.wxtip .wxbtns{display:flex;gap:10px;margin-top:6px;flex-wrap:wrap;justify-content:center}
+.wxtip .btn-l{min-width:150px}
+.browser-tip{position:fixed;left:12px;right:12px;top:58px;z-index:90;padding:9px 12px;border-radius:10px;background:rgba(183,121,31,.95);color:#fff;font-size:12px;display:flex;gap:8px;align-items:center;box-shadow:var(--shadow)}
+.browser-tip button{margin-left:auto;color:#fff;font-weight:700;white-space:nowrap}
+</style>
+<script>
+/* 内置浏览器检测与引导 */
+(function(){
+  const ua=navigator.userAgent||'';
+  const inWx=/MicroMessenger/i.test(ua);
+  const inQQ=/\bMQQBrowser\b/i.test(ua)&&!inWx;
+  window.__inEmbed=inWx||inQQ;
+  window.addEventListener('DOMContentLoaded',()=>{
+    if(window.__inEmbed){
+      const el=document.querySelector('#wxtip');
+      if(el){el.classList.remove('hidden');
+        const t=el.querySelector('#wxTitle');
+        if(t)t.textContent=inWx?'微信里无法调用摄像头':'当前浏览器无法使用摄像头';
+        const c=el.querySelector('#wxCose');if(c)c.onclick=()=>el.classList.add('hidden');
+        const go=el.querySelector('#wxGo');if(go)go.onclick=()=>{el.classList.add('hidden')};
+      }
+    }else if(!/Chrome|CriOS|Edg/i.test(ua)&&/Mobile/i.test(ua)){
+      const bt=document.querySelector('#browserTip');
+      if(bt){bt.classList.remove('hidden');bt.querySelector('button').onclick=()=>bt.remove()}
+    }
+  });
+})();
+</script>
 </head>
 <body>
+
+<!-- 微信/QQ 内置浏览器引导 -->
+<div id="wxtip" class="wxtip hidden">
+  <div class="arrow">⬆️</div>
+  <h2 id="wxTitle">微信里无法调用摄像头</h2>
+  <ol>
+    <li>点右上角 <b>「···」</b> 或 <b>「⋯」</b></li>
+    <li>选择 <b>「在浏览器打开」</b>（iPhone 请选 Safari，安卓请选 Chrome / 系统浏览器）</li>
+    <li>在系统浏览器里重新打开本页即可正常测试</li>
+  </ol>
+  <div class="wxbtns">
+    <button class="btn-l" id="wxGo">我已用系统浏览器打开（关闭提示）</button>
+    <button class="btn-l ghost" id="wxCose">仍要继续（摄像头将不可用）</button>
+  </div>
+</div>
+<div id="browserTip" class="browser-tip hidden">
+  <span>检测到第三方浏览器：建议用<b>系统自带浏览器</b>（iPhone 用 Safari，安卓用 Chrome）打开，摄像头兼容性最好。</span>
+  <button>知道了</button>
+</div>
 
 <header class="top">
   <div class="brand">
@@ -1252,19 +1327,19 @@ function setPrepStep(n){
 /* —— 摆机四检（步骤 1）：四项全绿才放行 —— */
 let CHK={full:false,dist:false,height:false,ground:false,distTxt:'—',hTxt:'—',gTxt:'—'};
 function precheckOf(lm){
-  const ok=(i)=>vis(lm,i)>=0.55;
+  const ok=(i)=>vis(lm,i)>=0.45;
   const full=[0,11,12,23,24,25,26,27,28].every(ok);
   let dist=false,distTxt='—',height=false,hTxt='—',ground=false,gTxt='—';
   if(full){
     const noseY=lm[0].y,akY=Math.min(lm[27].y,lm[28].y);
     const span=(akY-noseY)/2;                       /* 半身比例（0~1） */
-    dist=span>0.36&&span<0.5;distTxt=(span*2*100).toFixed(0)+'% 画面高度';
+    dist=span>0.30&&span<0.55;distTxt=(span*2*100).toFixed(0)+'% 画面高度（合适 60%~110%）';
     const hipY=(lm[23].y+lm[24].y)/2;
-    height=hipY>0.30&&hipY<0.62;hTxt='髋部位于画面 '+Math.round(hipY*100)+'% 高度';
+    height=hipY>0.22&&hipY<0.70;hTxt='髋部位于画面 '+Math.round(hipY*100)+'% 高度';
     const shTilt=Math.abs(lm[11].y-lm[12].y);
     const akFar=Math.abs(lm[27].x-lm[28].x)>0.16;
     const akTilt=akFar?Math.abs(lm[27].y-lm[28].y):0;
-    ground=shTilt<0.07&&(akTilt<0.05);gTxt='肩线倾斜 '+Math.round(shTilt*100)+'%'+(akFar?' · 踝线 '+Math.round(akTilt*100)+'%':'');
+    ground=shTilt<0.10&&(akTilt<0.09);gTxt='肩线倾斜 '+Math.round(shTilt*100)+'%'+(akFar?' · 踝线 '+Math.round(akTilt*100)+'%':'');
   }
   return {full,dist,distTxt,height,hTxt,ground,gTxt};
 }
@@ -1272,15 +1347,15 @@ function renderChecksHTML(){
   const c=CHK;
   const items=[
     ['全身入镜','头、肩、髋、膝、踝全部可见',c.full,'头肩髋膝踝齐备'+(c.full?' ✓':c.full===false?'… 未齐':'')],
-    ['距离合适（1.5~2.5 米）','全身占画面约 72%~100% 高度',c.dist,c.distTxt||'—'],
-    ['镜头高度接近腰高','髋部在画面中央区域（±30%）',c.height,c.hTxt||'—'],
+    ['距离合适（1.5~2.5 米）','全身占画面约 60%~110% 高度',c.dist,c.distTxt||'—'],
+    ['镜头高度接近腰高','髋部在画面中部区域（22%~70%）',c.height,c.hTxt||'—'],
     ['地面水平 / 手机端正','肩线接近水平，双脚落地',c.ground,c.gTxt||'—']
   ];
-  const hint=!c.full?'请站到画面中央，确保<b>全身</b>（头到脚）都在画面内：骨架取不全，后面所有判定都是白算。'
-    :!c.dist?'距离不合适：<b>太近请后退半步，太远请靠近一点</b>（目标：全身占画面约 72%~100% 高度，约 1.5~2.5 米）。'
-    :!c.height?'镜头高度不对：<b>请把手机放低到腰部附近</b>（同伴持机：下蹲半蹲持机即可）。'
+  const hint=!c.full?'请看画面里的<b>骨架线和绿框</b>：让全身（头到脚）都进入绿色虚线框内。面板只是提示，不要只盯着面板。'
+    :!c.dist?'距离不合适：<b>太近请后退半步，太远请靠近一点</b>（目标：全身占画面 60%~110% 高度）。'
+    :!c.height?'镜头高度不对：<b>请把手机放低到腰部附近</b>（同伴持机：半蹲持机即可）。'
     :!c.ground?'手机或地面不平：<b>把手机摆正</b>（横平竖直靠墙/靠书包），地面用胶带贴出站位线。'
-    :'四项全绿 ✓ 可以开始。手机零成本支架：靠墙、靠书包、靠水瓶；背对均匀光源（白墙、天空），不要逆光。';
+    :'四项全绿 ✓ 可以开始。背对均匀光源（白墙、天空），不要逆光。';
   return `<div class="checks">
     ${items.map(([t,d,ok,v])=>`<div class="chk ${ok?'ok':''}"><div class="led"></div><div><div class="ct">${t}</div><div class="cd">${d}<br><span class="val">${v}</span></div></div></div>`).join('')}
   </div>
@@ -1450,8 +1525,8 @@ async function enterPrepare(){
   if(S.running||S.phase==='prepare')return;
   const u=activeUser();
   if(!u){toast('请先创建 / 选择学生（身份绑定是签名的前提）','bad');renderUsers();openModal('userModal');return}
-  if(S.mode==='cam'&&typeof Pose==='undefined'){
-    toast('姿态引擎仍在下载（首次约 10~30 秒），状态灯变绿后再开始','bad');
+  if(S.mode==='cam'&&typeof window.PoseLandmarker==='undefined'){
+    toast('姿态引擎仍在加载（首次约 10~30 秒），状态灯变绿后再开始','bad');
     return;
   }
   S.phase='prepare';S.prepStep=1;S.ev=[];S.log=[];S.assisted=false;S.lowStreak=0;
@@ -1470,8 +1545,9 @@ async function enterPrepare(){
 async function prepLoop(){
   if(S.phase!=='prepare')return;
   const video=$('#video');
-  /* 必须逐帧 await：MediaPipe 不支持并发 send，否则 wasm 会二次初始化直接 Aborted */
-  if(video.readyState>=2&&poseInst){try{await poseInst.send({image:video})}catch(e){}}
+  /* 摄像头逐帧：detectForVideo 同步返回结果，时间戳单调 */
+  const r=await sendFrame(video);
+  if(r)handleResults(r);
   loopId=requestAnimationFrame(prepLoop);
 }
 function exitPrepare(stopCamV){
@@ -1514,29 +1590,65 @@ async function toRun(){
   await getPose();
   rafLoop();
 }
-/* —— MediaPipe Pose —— */
+/* —— 姿态引擎（MediaPipe Tasks Vision · PoseLandmarker）—— */
 const POSE_CONN=[[0,1],[1,2],[2,3],[3,7],[0,4],[4,5],[5,6],[6,8],[9,10],[11,12],[11,13],[13,15],[15,17],[15,19],[15,21],[17,19],[12,14],[14,16],[16,18],[16,20],[16,22],[18,20],[11,23],[12,24],[23,24],[23,25],[24,26],[25,27],[26,28],[27,29],[28,30],[29,31],[30,32],[27,31],[28,32]];
-async function pickPoseBase(){
-  if(POSE_BASE)return POSE_BASE;
-  const bases=['./','https://registry.npmmirror.com/@mediapipe/pose/0.5.1675469404/files/','https://cdn.jsdelivr.net/npm/@mediapipe/pose/'];
-  for(const b of bases){
-    try{const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),6000);
-      const r=await fetch(b+'pose_landmark_lite.tflite',{signal:ctl.signal,cache:'force-cache'});
-      clearTimeout(to);if(r.ok){POSE_BASE=b;return b}}catch(e){}
+let lastVideoTime=-1;
+async function pickTasksBase(){
+  if(window.__tasksBase)return window.__tasksBase;
+  for(const b of window.TASKS_BASE){
+    try{
+      const probe=b.endsWith('/')?b+'vision_wasm_internal.js':b+'vision_wasm_internal.js';
+      const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),6000);
+      const r=await fetch(probe,{method:'HEAD',signal:ctl.signal});clearTimeout(to);
+      if(r.ok){window.__tasksBase=b;return b}
+    }catch(e){}
   }
-  POSE_BASE=bases[0];return POSE_BASE;
+  window.__tasksBase=window.TASKS_BASE[0];return window.__tasksBase;
+}
+async function pickModelUrl(){
+  for(const u of window.MODEL_URLS){
+    if(u.startsWith('http')){
+      try{const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),6000);
+        const r=await fetch(u,{method:'HEAD',signal:ctl.signal});clearTimeout(to);if(r.ok)return u}catch(e){}
+    }else{
+      try{const r=await fetch(u,{method:'HEAD'});if(r.ok)return u}catch(e){}
+    }
+  }
+  return window.MODEL_URLS[0];
 }
 function getPose(){
   if(poseP)return poseP;
-  if(typeof Pose==='undefined')return null;
+  if(typeof window.PoseLandmarker==='undefined')return null;
   poseP=(async()=>{
-    const base=await pickPoseBase();
-    const p=new Pose({locateFile:f=>base+f});
-    p.setOptions({modelComplexity:0,smoothLandmarks:true,enableSegmentation:false,minDetectionConfidence:0.5,minTrackingConfidence:0.5});
-    p.onResults(handleResults);
-    poseInst=p;return p;
+    const base=await pickTasksBase();
+    const vision=await window.FilesetResolver.forVisionTasks(base);
+    const model=await pickModelUrl();
+    const l=await window.PoseLandmarker.createFromOptions(vision,{
+      baseOptions:{modelAssetPath:model,delegate:'GPU'},
+      runningMode:'VIDEO',numPoses:1,
+      minPoseDetectionConfidence:0.4,minPosePresenceConfidence:0.4,minTrackingConfidence:0.4,
+      outputSegmentationMasks:false
+    }).catch(async e=>{
+      /* GPU delegate 失败 → 回退 CPU */
+      return await window.PoseLandmarker.createFromOptions(vision,{
+        baseOptions:{modelAssetPath:model,delegate:'CPU'},
+        runningMode:'VIDEO',numPoses:1,
+        minPoseDetectionConfidence:0.4,minPosePresenceConfidence:0.4,minTrackingConfidence:0.4,
+        outputSegmentationMasks:false
+      });
+    });
+    poseInst=l;return l;
   })();
   return poseP;
+}
+/* 统一送帧：摄像头与视频都走 detectForVideo，时间戳单调递增 */
+async function sendFrame(video){
+  if(!poseInst||video.readyState<2)return null;
+  try{
+    const r=poseInst.detectForVideo(video,performance.now());
+    poseErr=0;
+    return r;
+  }catch(e){poseErr++;return null}
 }
 async function startCam(){
   const video=$('#video');
@@ -1578,6 +1690,23 @@ function drawSkeleton(lm){
   }
   ctx.fillStyle='#2F80ED';
   for(const p of lm){if(!p||p.visibility<0.5)continue;ctx.beginPath();ctx.arc(p.x*cv.width,p.y*cv.height,4,0,Math.PI*2);ctx.fill()}
+  /* 人体包围框：绿=全身可见可开测；橙=没看全，把人挪进框内 */
+  const key=[0,11,12,23,24,25,26,27,28];
+  const vis=key.filter(i=>lm[i]&&lm[i].visibility>=0.45).length;
+  const pts=lm.filter(p=>p&&p.visibility>=0.45);
+  if(pts.length>=4){
+    const xs=pts.map(p=>p.x),ys=pts.map(p=>p.y);
+    const x0=Math.max(0,Math.min(...xs)*cv.width-14),x1=Math.min(cv.width,Math.max(...xs)*cv.width+14);
+    const y0=Math.max(0,Math.min(...ys)*cv.height-14),y1=Math.min(cv.height,Math.max(...ys)*cv.height+14);
+    ctx.save();
+    ctx.setLineDash([10,7]);ctx.lineWidth=3.5;
+    ctx.strokeStyle=vis>=key.length?'rgba(47,207,130,.95)':'rgba(255,171,64,.95)';
+    ctx.strokeRect(x0,y0,x1-x0,y1-y0);
+    ctx.restore();
+    ctx.font='bold 16px sans-serif';
+    ctx.fillStyle=vis>=key.length?'rgba(47,207,130,.95)':'rgba(255,171,64,.95)';
+    ctx.fillText(vis>=key.length?'✓ 全身已在框内':'人体未看全：请后退或调整机位',x0,Math.max(22,y0-10));
+  }
 }
 function doFlash(kind,text){
   const f=$('#flash');f.className='flash '+kind;f.textContent=text;void f.offsetWidth;f.classList.add('show');
@@ -1593,11 +1722,18 @@ function keyConf(lm,ex){
   const ids=ex==='pullup'?[0,15,16,11,12]:ex==='situp'?[11,12,23,24,25,26]:[11,12,23,24,25,26,27,28];
   let s=0;for(const i of ids)s+=vis(lm,i);return s/ids.length;
 }
+/* Tasks 结果 → 旧格式骨架数组（visibility 缺省按 1 处理） */
+function lmOf(r){
+  const a=r&&r.landmarks&&r.landmarks[0];
+  if(!a||!a.length)return null;
+  for(const p of a)if(p.visibility==null)p.visibility=1;
+  return a;
+}
 function handleResults(res){
-  drawSkeleton(res.pose_landmarks);
-  if(S.phase==='prepare'&&S.mode==='cam'){precheckUpdate(res.pose_landmarks);return}
+  const lm=lmOf(res);
+  drawSkeleton(lm);
+  if(S.phase==='prepare'&&S.mode==='cam'){precheckUpdate(lm);return}
   if(!S.running||S.phase!=='run')return;
-  const lm=res.pose_landmarks;
   if(!lm){$('#stateTxt').textContent='未检测到人体，请确保全身在画面内且光线充足';return}
   const conf=keyConf(lm,S.ex);
   /* 低置信度 → 降级辅助计数（连续 3 秒以上） */
@@ -1637,12 +1773,24 @@ function tick(){
 async function rafLoop(){
   if(!S.running)return;
   const video=$('#video');
+  if(S.mode==='file'){
+    /* 视频：逐帧确定性送帧（requestVideoFrameCallback 优先，每帧必送） */
+    if(poseInst&&video.readyState>=2&&!video.ended){
+      const r=await sendFrame(video);
+      if(r)handleResults(r);
+    }
+    if(poseErr>=30){showStageErr('姿态引擎异常（连续失败）：请退出重试。');finishSession(false);return}
+    if(video.ended){finishSession(true);return}
+    if(video.requestVideoFrameCallback){video.requestVideoFrameCallback(()=>rafLoop())}
+    else{setTimeout(()=>rafLoop(),40)}
+    return;
+  }
+  /* 摄像头：rAF 逐帧 */
   if(video.readyState>=2&&poseInst){
-    try{await poseInst.send({image:video});poseErr=0}
-    catch(e){poseErr++;if(poseErr===30){showStageErr('姿态引擎异常（连续失败）：请退出重试；本组可用「结束测试」后改离线复核视频。');toast('引擎连续错误，已暂停推理','bad')}}
+    const r=await sendFrame(video);
+    if(r)handleResults(r);
   }
   if(poseErr>=30){finishSession(false);return}
-  if(S.mode==='file'&&video.ended){finishSession(true);return}
   loopId=requestAnimationFrame(rafLoop);
 }
 $('#mPlus').addEventListener('click',()=>{
@@ -2471,7 +2619,7 @@ $('#tabs').addEventListener('click',e=>{
 });
 function showStageErr(msg){const old=$('#stageErr');if(old)old.remove();const d=document.createElement('div');d.id='stageErr';d.className='stage-err';d.textContent=msg;$('#stage').appendChild(d)}
 function hideStageErr(){const d=$('#stageErr');if(d)d.remove()}
-setInterval(()=>{const el=$('#engineStat');if(!el)return;const r=!!window.POSE_READY;el.textContent=r?'引擎就绪（离线可用）':'引擎加载中…';el.classList.toggle('on',r)},700);
+setInterval(()=>{const el=$('#engineStat');if(!el)return;const r=!!window.PoseLandmarker;el.textContent=r?(poseInst?'引擎就绪（离线可用）':'引擎就绪 · 模型加载中'):'引擎加载中…';el.classList.toggle('on',!!poseInst)},700);
 $$('button[data-close]').forEach(b=>b.addEventListener('click',()=>closeModal(b.dataset.close)));
 
 /*===================== 自检（对标设计书附录 A/B 断言） ===================== */
