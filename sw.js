@@ -1,5 +1,5 @@
 /* 体测仲裁教练 v2 · Service Worker：首次安装预缓存引擎，此后判定/计分/签名/导出全程离线 */
-const V='tzb2-2026-11-20e';
+const V='tzb2-2026-11-20f';
 const ORIGIN=location.origin;
 const PRECACHE=[
   './','manifest.json','icon-192.png','icon-512.png',

@@ -1023,20 +1023,20 @@ function bonusStrength(sex,band,count){
 /*===================== 项目定义（自动计量 3 项 + 跳绳训练计数） ===================== */
 const EXERCISES={
   pullup:{name:'引体向上',unit:'次',auto:true,gb:true,sex:'M',stdNote:'计分表取自《国家学生体质健康标准（2014年修订）》男生单项评分表（按年级组自动取行）。',
-    shoot:'<b>机位建议：</b>手机架在单杠正前方 2~3 米、镜头接近腰高，<b>双手与头部必须同框</b>。判定：肘角下悬垂 ≥155° → 上顶点 ≤78° 为一个完整循环；下颌过杠（手-下颌高差 &lt; 0.045，代理判据）；髋部横向摆动超 0.75/秒判借力。'},
+    shoot:'<b>机位建议：</b>手机架在单杠正前方 2~3 米、镜头接近腰高，<b>双手与头部必须同框</b>。判定（宽松口径）：肘角下悬垂 ≥150° → 上顶点 ≤90° 为一个循环；下颌过杠（手-下颌高差 &lt; 0.06，代理判据）；髋部横向摆动超 0.95/秒才判借力。'},
   situp:{name:'一分钟仰卧起坐',unit:'个',auto:true,gb:true,sex:'F',stdNote:'计分表取自国标女生一分钟仰卧起坐评分表（按年级组自动取行）。个数计分；动作达标线为本系统宽裕口径，可在规则包调整。',
-    shoot:'<b>机位建议：</b>从<b>侧面</b>拍摄，肩、髋、膝同框。判定（宽松口径）：躺平时躯干角 ≥150°（背贴地）→ 起坐时 ≤110°（上身抬起靠腿方向）为一个循环，单次不少于 0.30 秒。'},
+    shoot:'<b>机位建议：</b>从<b>侧面</b>拍摄，肩、髋、膝同框。判定（宽松口径）：躺平时躯干角 ≥145°（背贴地）→ 起坐时 ≤115°（上身抬起靠腿方向）为一个循环，单次不少于 0.25 秒。'},
   pushup:{name:'俯卧撑',unit:'个',auto:true,gb:false,custom:true,stdNote:'俯卧撑不在国标八项内：分值来自本校自定义标定表（40 次满分、10 次起计），仅训练与随堂测验参考，不进国标上报。',
-    shoot:'<b>机位建议：</b>从<b>侧面</b>拍摄，身体呈水平。判定（宽松口径）：肘角 ≤105° 且肩-髋-踝 ≥150°（不明显塌腰）；膝着地判降级动作。'},
+    shoot:'<b>机位建议：</b>从<b>侧面</b>拍摄，身体呈水平。判定（宽松口径）：肘角 ≤115° 且肩-髋-踝 ≥145°（不明显塌腰）；膝着地判降级动作。'},
   rope:{name:'跳绳（训练计数）',unit:'个',auto:false,countOnly:true,custom:true,stdNote:'高校国标不含跳绳（仅小学组测 1 分钟跳绳，且不折算分数）——本项只做训练计数：只计个数、不判空摇、不判并脚、不进上报；确有该项目的学校给规则包补一张表即可计分。',
     shoot:'<b>机位建议：</b>全身入镜，地面可见。训练模式只认双脚同时离地（≥2 帧或 ≥0.09 秒）为一次，节奏与连续性提示见结果页。'}
 };
 
 /*===================== L1 计量层判据（附录 B，程序实际生效值） ===================== */
 const JUDGE_DEF={
-  pullup:{topElbow:78,hangElbow:155,swing:0.75,chin:0.045,minDur:0.45},
-  situp:{up:110,down:150,minDur:0.30,elbowKnee:false},
-  pushup:{deep:105,straight:150,minDur:0.35},
+  pullup:{topElbow:90,hangElbow:150,swing:0.95,chin:0.06,minDur:0.30},
+  situp:{up:115,down:145,minDur:0.25,elbowKnee:false},
+  pushup:{deep:115,straight:145,minDur:0.25},
   rope:{airFrames:2,minAir:0.09},
   common:{conf:0.85}
 };
@@ -1050,11 +1050,12 @@ function judgeTable(exId){/* 项目确认页（步骤3）展示的判据清单 *
 }
 
 /*===================== 规则包（L1+L2+L3 三层，QR 分发） ===================== */
-const PACK_DEFAULT={b:'ZJPT-2026.2',v:'ZJPT-2026.2',name:'国标默认（浙邮 2026.2 · 宽松口径）',u:0,o:{},p:{}};
+const PACK_DEFAULT={b:'ZJPT-2026.3',v:'ZJPT-2026.3',name:'国标默认（浙邮 2026.3 · 先能动起来）',u:0,o:{},p:{}};
 const PUSHUP_ROWS=[[10,40],[15,50],[20,60],[25,70],[30,80],[35,90],[40,100]];
 function loadPack(){let p=null;try{p=JSON.parse(localStorage.getItem('tzb_pack')||'null')}catch(e){}
-  /* 未自定义过的旧默认包 → 升级到新默认（阈值放宽）；用户保存过的包不动 */
-  if(!p||!p.b||(!p.u&&p.v!==PACK_DEFAULT.v))p=JSON.parse(JSON.stringify(PACK_DEFAULT));
+  /* 没有自定义覆盖的旧默认包 → 自动升级到新默认；用户保存过覆盖（评分表/判据）的包不动 */
+  const hasOv=p&&((p.o&&Object.keys(p.o).length)||(p.p&&Object.keys(p.p).length));
+  if(!p||!p.b||(!hasOv&&p.v!==PACK_DEFAULT.v))p=JSON.parse(JSON.stringify(PACK_DEFAULT));
   return p}
 async function savePack(p){p.u=Date.now();p.hash=await packHash(p);localStorage.setItem('tzb_pack',JSON.stringify(p));ACTIVE_PACK=p;renderPackBadges()}
 function canonicalPack(p){return JSON.stringify({b:p.b,v:p.v,o:p.o,p:p.p})}
@@ -1193,7 +1194,7 @@ class SitUpDet extends BaseDet{
     let flash=null,progress=(j.down-trunk)/denom;
     if(this.state==='待命'&&isDown)this.state='躺下就绪';
     if(this.state==='躺下就绪'){
-      if(trunk<j.down-8){/* 起身幅度足够才记一次尝试 */
+      if(trunk<j.down-5){/* 起身幅度足够才记一次尝试 */
         this.state='抬起中';this.a={t0:t,minTrunk:trunk,upFrame:null};
       }
     }else if(this.state==='抬起中'){
@@ -1598,15 +1599,47 @@ async function toRun(){
   hideStageErr();
   $('#stageIdle').classList.add('hidden');
   $('#evBadge').classList.remove('hidden');
-  $('#assistBar').classList.add('hidden');
   $('#startBtn').classList.add('hidden');$('#stopBtn').classList.remove('hidden');
   $$('#exChips .ex-chip').forEach(b=>b.disabled=true);
   $('#modeSeg').style.pointerEvents='none';$('#durSel').disabled=true;$('#camFace').disabled=true;
+  await getPose();
+  if(S.mode==='cam'){
+    /* 开始前 3 秒倒数：请准备 3-2-1-开始，倒计时期间不计时不计数 */
+    await runCountdown(ex);
+    S.t0perf=performance.now();S.t0=Date.now();
+  }
   toast(`开始：${ex.name}${S.dur?`（限时 ${S.dur} 秒）`:''} · 有效/无效当场反馈`,'ok');
   say(`开始${ex.name}测试`);
   S.timerId=setInterval(tick,250);tick();
-  await getPose();
   rafLoop();
+  if(S.mode==='file'){
+    /* 短视频保险丝：确保视频播完一定结算（不依赖逐帧回调），且不允许循环重放灌数 */
+    video.loop=false;
+    S.endWatch=setInterval(()=>{const v=$('#video');if(S.running&&S.mode==='file'&&v&&v.ended)finishSession(true)},300);
+  }
+}
+async function runCountdown(ex){
+  let ov=document.querySelector('#countOv');
+  if(!ov){
+    ov=document.createElement('div');ov.id='countOv';
+    ov.style.cssText='position:absolute;inset:0;z-index:6;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(10,20,36,.42);color:#fff;pointer-events:none';
+    ov.innerHTML='<div id="cdTip" style="font-size:20px;font-weight:700;text-shadow:0 2px 8px rgba(0,0,0,.6)">请准备</div><div id="cdNum" style="font-size:88px;font-weight:800;line-height:1.1;text-shadow:0 4px 16px rgba(0,0,0,.6)">3</div>';
+    document.querySelector('#stage').appendChild(ov);
+  }
+  ov.classList.remove('hidden');ov.style.display='flex';
+  const tip=ov.querySelector('#cdTip'),num=ov.querySelector('#cdNum');
+  tip.textContent=`${ex.name} · 请准备`;
+  say('请准备');
+  await new Promise(r=>setTimeout(r,900));
+  for(const n of [3,2,1]){
+    num.textContent=n;num.style.transform='scale(1.25)';void num.offsetWidth;num.style.transform='scale(1)';
+    say(String(n));
+    await new Promise(r=>setTimeout(r,950));
+  }
+  num.textContent='开始！';
+  doFlash('ok','开始！');
+  await new Promise(r=>setTimeout(r,500));
+  ov.style.display='none';
 }
 /* —— 姿态引擎（MediaPipe Tasks Vision · PoseLandmarker）—— */
 const POSE_CONN=[[0,1],[1,2],[2,3],[3,7],[0,4],[4,5],[5,6],[6,8],[9,10],[11,12],[11,13],[13,15],[15,17],[15,19],[15,21],[17,19],[12,14],[14,16],[16,18],[16,20],[16,22],[18,20],[11,23],[12,24],[23,24],[23,25],[24,26],[25,27],[26,28],[27,29],[28,30],[29,31],[30,32],[27,31],[28,32]];
@@ -1756,9 +1789,9 @@ function handleResults(res){
   if(!S.running||S.phase!=='run')return;
   if(!lm){$('#stateTxt').textContent='未检测到人体，请确保全身在画面内且光线充足';return}
   const conf=keyConf(lm,S.ex);
-  /* 低置信度 → 降级辅助计数（连续 3 秒以上） */
+  /* 低置信度 → 只提示调整机位；不再提供人工+1（避免误触灌数） */
   if(conf<JUDGE_DEF.common.conf){S.lowStreak++}else{S.lowStreak=0}
-  if(S.lowStreak>60&&!S.assisted){S.assisted=true;$('#assistBar').classList.remove('hidden');toast('识别置信度不足：已降级为辅助计数（成绩单将标注）','bad');say('识别不稳，请同伴辅助计数')}
+  if(S.lowStreak>90&&S.lowStreak%90===0){toast('识别置信度偏低：请改善光线、让人更靠近画面中心','bad')}
   const t=(performance.now()-S.t0perf)/1000;
   const r=S.det.update(lm,t);
   $('#metrics').innerHTML=r.metrics.map(m=>`<div class="m-row"><label>${esc(m[0])}</label><b>${esc(m[1])}</b></div>`).join('');
@@ -1813,10 +1846,6 @@ async function rafLoop(){
   if(poseErr>=30){finishSession(false);return}
   loopId=requestAnimationFrame(rafLoop);
 }
-$('#mPlus').addEventListener('click',()=>{
-  if(!S.running)return;S.assisted=true;
-  S.valid++;$('#validN').textContent=S.valid;addLog('ok','辅助计数：人工确认有效 +1');say('人工确认一次');
-});
 function finishSession(auto){
   if(!S.running)return;
   S.running=false;S.phase='idle';
@@ -1824,7 +1853,9 @@ function finishSession(auto){
   if(loopId)cancelAnimationFrame(loopId);loopId=null;
   stopCam();
   drawSkeleton(null);
-  $('#evBadge').classList.add('hidden');$('#assistBar').classList.add('hidden');
+  $('#evBadge').classList.add('hidden');
+  if(S.endWatch){clearInterval(S.endWatch);S.endWatch=null}
+  const cov=document.querySelector('#countOv');if(cov)cov.style.display='none';
   $('#stageIdle').classList.remove('hidden');
   $('#startBtn').classList.remove('hidden');$('#stopBtn').classList.add('hidden');
   $$('#exChips .ex-chip').forEach(b=>b.disabled=false);
@@ -2059,7 +2090,7 @@ $('#exportBtn').addEventListener('click',async()=>{
 /*===================== 训练计划页（教练模块） ===================== */
 const PLAN_TIPS={
   pullup:['弹力带辅助引体 4 组 × 8 次，幅度做满（下巴过杠再下放再计一次）','离心下放：跳上杠后 5 秒缓慢下落，5 次 × 4 组','标准引体 5 组 ×（力竭次数的 60%），组间休息 2 分钟','模拟测试：完整做一组计时引体，对照评分表检验 4 周成果'],
-  situp:['仰卧卷腹 3 组 × 20 次，用腹部发力，避免颈部代偿','半程定向练习：肘碰膝 4 组 × 15 次（本系统宽松口径 110°/150°）','完整仰卧起坐 4 组 × 力竭次数的 70%，组间休息 90 秒','计时模拟：60 秒全力测试，对照评分表看差距'],
+  situp:['仰卧卷腹 3 组 × 20 次，用腹部发力，避免颈部代偿','半程定向练习：肘碰膝 4 组 × 15 次（本系统宽松口径 115°/145°）','完整仰卧起坐 4 组 × 力竭次数的 70%，组间休息 90 秒','计时模拟：60 秒全力测试，对照评分表看差距'],
   pushup:['跪姿俯卧撑 3 组 × 12 次，保持躯干平直不塌腰','标准俯卧撑离心下放（3 秒下放到肘角 95°）4 组 × 6 次','标准俯卧撑 5 组 × 力竭次数的 70%，组间休息 90 秒','模拟测试：连续标准俯卧撑计时计数，检查塌腰与深度'],
   rope:['分段跳 30 秒 × 4 组（组间 30 秒），练节奏稳定性','单摇基础：2 分钟连续慢跳，中断即重来','提速组：15 秒全速 × 6 组，记录每段个数','模拟测试：60 秒连续计数，对比前后半程频率衰减']
 };
