@@ -1,5 +1,5 @@
 /* 体测仲裁教练 v2 · Service Worker：首次安装预缓存引擎，此后判定/计分/签名/导出全程离线 */
-const V='tzb2-2026-11-19b';
+const V='tzb2-2026-11-20c';
 const ORIGIN=location.origin;
 const PRECACHE=[
   './','manifest.json','icon-192.png','icon-512.png',
@@ -37,6 +37,23 @@ self.addEventListener('fetch',e=>{
   const same=url.origin===ORIGIN;
   if(!cdn&&!same)return;
   if(url.pathname.endsWith('sw.js'))return;
+  /* 页面导航：网络优先（保证更新立即生效），3 秒内没拿到就用缓存兜底 */
+  if(e.request.mode==='navigate'){
+    e.respondWith((async()=>{
+      const c=await caches.open(V);
+      try{
+        const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),3000);
+        const r=await fetch(e.request,{signal:ctl.signal,cache:'reload'});
+        clearTimeout(to);
+        if(r&&r.status===200){try{c.put(e.request,r.clone())}catch(err){}}
+        return r;
+      }catch(err){
+        const hit=await c.match(e.request,{ignoreVary:true});
+        return hit||(await c.match('./',{ignoreVary:true}))||Response.error();
+      }
+    })());
+    return;
+  }
   e.respondWith((async()=>{
     const c=await caches.open(V);
     const hit=await c.match(e.request,{ignoreVary:true});

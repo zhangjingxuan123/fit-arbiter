@@ -465,7 +465,7 @@ footer .link-btn{font-size:11px}
         <div class="ctrl-row">
           <div class="seg" id="modeSeg">
             <button data-mode="cam" class="active">摄像头实时</button>
-            <button data-mode="file">离线复核视频</button>
+            <button data-mode="file">上传视频分析</button>
           </div>
           <select id="camFace" class="sel" title="摄像头选择">
             <option value="user">前置摄像头</option>
@@ -1841,7 +1841,7 @@ async function renderRecords(){
       const cls=r.score==null?'':r.score>=90?'s-hi':r.score>=60?'s-mid':r.score>0?'s-low':'s-zero';
       return `<tr id="recrow-${r.id}">
         <td>${fmtTs(r.ts)}<br><span class="rule-tag">${esc(r.sid||'—')}</span></td>
-        <td>${esc(ex.name)}${r.band?`<br><span class="rule-tag">${r.band}</span>`:''}</td>
+        <td>${esc(ex.name)}${r.band?`<br><span class="rule-tag">${r.band}</span>`:''}${r.mode==='file'?'<br><span class="rule-tag">视频复盘</span>':''}</td>
         <td><b>${r.valid}${esc(ex.unit)}</b>${r.fix?`<br><span class="sig-ap">修正 ${r.fix.n}</span>`:''}</td>
         <td>${r.invalid}${r.assisted?'<br><span class="sig-no">辅助</span>':''}</td>
         <td class="score ${cls}">${r.score==null?'—':r.score+'分'}<br><span style="font-size:11px;color:var(--sub)">${r.grade||''}</span></td>
