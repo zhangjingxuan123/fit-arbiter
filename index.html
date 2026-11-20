@@ -1027,7 +1027,7 @@ const EXERCISES={
   situp:{name:'一分钟仰卧起坐',unit:'个',auto:true,gb:true,sex:'F',stdNote:'计分表取自国标女生一分钟仰卧起坐评分表（按年级组自动取行）。个数计分；动作达标线为本系统宽裕口径，可在规则包调整。',
     shoot:'<b>机位建议：</b>从<b>侧面</b>拍摄，肩、髋、膝同框。判定（宽松口径）：躺平时躯干角 ≥145°（背贴地）→ 起坐时 ≤115°（上身抬起靠腿方向）为一个循环，单次不少于 0.25 秒。'},
   pushup:{name:'俯卧撑',unit:'个',auto:true,gb:false,custom:true,stdNote:'俯卧撑不在国标八项内：分值来自本校自定义标定表（40 次满分、10 次起计），仅训练与随堂测验参考，不进国标上报。',
-    shoot:'<b>机位建议：</b>从<b>侧面</b>拍摄，身体呈水平。判定（宽松口径）：肘角 ≤115° 且肩-髋-踝 ≥145°（不明显塌腰）；膝着地判降级动作。'},
+    shoot:'<b>机位建议：</b>从<b>侧面</b>拍摄，身体呈水平。判定（宽松口径）：肘角 ≤125° 且肩-髋-踝 ≥140°（不明显塌腰）；膝着地判降级动作。'},
   rope:{name:'跳绳（训练计数）',unit:'个',auto:false,countOnly:true,custom:true,stdNote:'高校国标不含跳绳（仅小学组测 1 分钟跳绳，且不折算分数）——本项只做训练计数：只计个数、不判空摇、不判并脚、不进上报；确有该项目的学校给规则包补一张表即可计分。',
     shoot:'<b>机位建议：</b>全身入镜，地面可见。训练模式只认双脚同时离地（≥2 帧或 ≥0.09 秒）为一次，节奏与连续性提示见结果页。'}
 };
@@ -1036,7 +1036,7 @@ const EXERCISES={
 const JUDGE_DEF={
   pullup:{topElbow:90,hangElbow:150,swing:0.95,chin:0.06,minDur:0.30},
   situp:{up:115,down:145,minDur:0.25,elbowKnee:false},
-  pushup:{deep:115,straight:145,minDur:0.25},
+  pushup:{deep:125,straight:140,minDur:0.25},
   rope:{airFrames:2,minAir:0.09},
   common:{conf:0.85}
 };
@@ -1044,13 +1044,13 @@ function judgeParams(exId){const base=JUDGE_DEF[exId]||{};const ov=(ACTIVE_PACK.
 function judgeTable(exId){/* 项目确认页（步骤3）展示的判据清单 */
   const j=judgeParams(exId);
   if(exId==='pullup')return [['下悬垂起始态','肘角 ≥ '+j.hangElbow+'°'],['上顶点','肘角 ≤ '+j.topElbow+'°'],['下颌过杠','手-下颌高差 < '+j.chin+'（代理判据）'],['摆动借力上限','髋部横向速度 ≤ '+j.swing+' /秒'],['单次最短时长','≥ '+j.minDur+' 秒'],['关键点置信度下限','≥ '+JUDGE_DEF.common.conf+'（低于自动降级辅助计数）']];
-  if(exId==='situp')return [['躺平回位','躯干角 ≥ '+j.down+'°'],['起坐到位','躯干角 ≤ '+j.up+'°'],['单次最短时长','≥ '+j.minDur+' 秒'],['手肘触膝','预留开关，默认关闭']];
+  if(exId==='situp')return [['躺平回位（自适应）','3D 躯干角 ≥ min('+j.down+'°, 本场最大角-12°)，不受机位透视影响'],['起坐到位','3D 躯干角 ≤ '+j.up+'°'],['单次最短时长','≥ '+j.minDur+' 秒'],['手肘触膝','预留开关，默认关闭']];
   if(exId==='pushup')return [['下潜深度','肘角 ≤ '+j.deep+'°'],['躯干直线','肩-髋-踝 ≥ '+j.straight+'°（不塌腰）'],['膝着地','判「降级动作」'],['单次最短时长','≥ '+j.minDur+' 秒']];
   return [['离地判定','双脚同时离地 ≥ '+j.airFrames+' 帧'],['单次最短腾空','≥ '+j.minAir+' 秒（低于视为踏步）'],['口径','训练计数：不判空摇、不判并脚、不折算分数']];
 }
 
 /*===================== 规则包（L1+L2+L3 三层，QR 分发） ===================== */
-const PACK_DEFAULT={b:'ZJPT-2026.3',v:'ZJPT-2026.3',name:'国标默认（浙邮 2026.3 · 先能动起来）',u:0,o:{},p:{}};
+const PACK_DEFAULT={b:'ZJPT-2026.4',v:'ZJPT-2026.4',name:'国标默认（浙邮 2026.4 · 3D 角度+自适应）',u:0,o:{},p:{}};
 const PUSHUP_ROWS=[[10,40],[15,50],[20,60],[25,70],[30,80],[35,90],[40,100]];
 function loadPack(){let p=null;try{p=JSON.parse(localStorage.getItem('tzb_pack')||'null')}catch(e){}
   /* 没有自定义覆盖的旧默认包 → 自动升级到新默认；用户保存过覆盖（评分表/判据）的包不动 */
@@ -1136,7 +1136,7 @@ class PullUpDet extends BaseDet{
     if(vis(lm,15)<0.35||vis(lm,16)<0.35||vis(lm,0)<0.4)
       return this.out('待命',[['状态','双手/头部未同时入镜']],0,null,'请调整机位：双手握杠与头部需同框');
     const wristY=(lm[LM.wrL].y+lm[LM.wrR].y)/2, noseY=lm[LM.nose].y;
-    const elbow=Math.min(this.ema('eL',ang(lm[LM.shL],lm[LM.elL],lm[LM.wrL])),this.ema('eR',ang(lm[LM.shR],lm[LM.elR],lm[LM.wrR])));
+    const elbow=Math.min(this.ema('eL',angL(lm,LM.shL,LM.elL,LM.wrL)),this.ema('eR',angL(lm,LM.shR,LM.elR,LM.wrR)));
     const hipX=(lm[LM.hipL].x+lm[LM.hipR].x)/2;
     const dt=Math.max(1e-3,t-this.prevT);
     if(this.prevHipX!=null){const vx=(hipX-this.prevHipX)/dt;this.sw=this.ema('vx',Math.abs(vx),0.2)}
@@ -1188,34 +1188,31 @@ class SitUpDet extends BaseDet{
     const [sh,hip,kn]=sideL>=sideR?[LM.shL,LM.hipL,LM.knL]:[LM.shR,LM.hipR,LM.knR];
     if(vis(lm,sh)<0.4||vis(lm,hip)<0.4||vis(lm,kn)<0.4)
       return this.out('待命',[['状态','肩/髋/膝未同时入镜']],0,null,'请从侧面拍摄，确保肩、髋、膝在画面内');
-    const trunk=this.ema('t',ang(lm[sh],lm[hip],lm[kn]));
-    const isDown=trunk>=j.down, isUp=trunk<=j.up;
-    const denom=Math.max(1,j.down-j.up);
-    let flash=null,progress=(j.down-trunk)/denom;
-    if(this.state==='待命'&&isDown)this.state='躺下就绪';
-    if(this.state==='躺下就绪'){
-      if(trunk<j.down-5){/* 起身幅度足够才记一次尝试 */
-        this.state='抬起中';this.a={t0:t,minTrunk:trunk,upFrame:null};
-      }
-    }else if(this.state==='抬起中'){
-      const a=this.a;a.minTrunk=Math.min(a.minTrunk,trunk);
-      if(!a.upFrame&&isUp)a.upFrame=this.frame();
-      if(isDown){                                  // 回落到底，出手判定
-        const aa=a;this.a=null;const dur=t-aa.t0;
-        this.state='躺下就绪';
-        if(aa.minTrunk<=j.up&&dur>=j.minDur)flash={kind:'valid',reason:'起坐到位，有效',ev:mkEv(aa,dur)};
-        else if(aa.minTrunk<=j.up)flash={kind:'invalid',reason:'动作过快（'+dur.toFixed(2)+' 秒）',ev:mkEv(aa,dur)};
-        else flash={kind:'invalid',reason:'起坐幅度不够（躯干 '+aa.minTrunk.toFixed(0)+'°> '+j.up+'°）',ev:mkEv(aa,dur)};
-      }
+const trunk=this.ema('t',angL(lm,sh,hip,kn),0.65);
+    /* 自适应回位线：取「本场已见最大角-18°」与 145° 中较小者（不低于 125°），不受机位透视影响 */
+    this.maxT=Math.max(this.maxT,trunk);
+    const dnTh=this.maxT>0?Math.min(j.down,Math.max(120,this.maxT-25)):j.down;
+    const denom=Math.max(1,dnTh-j.up);
+    let flash=null,progress=(dnTh-trunk)/denom;
+    /* 状态机：躺下(≥dnTh) → 起坐(≤up) 立即计一次 → 等待再次躺下 */
+    if(this.state==='已起坐'||this.state==='待命'){
+      if(trunk>=dnTh){this.state='躺下就绪';this.tDown=t}
     }
-    function mkEv(a,dur){
-      return {n:0,t0:a.t0,t1:a.t0+dur,frame:a.upFrame||captureFrame(),
-        values:[['收缩终态躯干角',a.minTrunk.toFixed(1)+'°','≤ '+j.up+'°',a.minTrunk<=j.up],
-                ['回位躯干角',j.down+'° 基准','≥ '+j.down+'°',true],
+    if(this.state==='躺下就绪'&&trunk<=j.up){
+      const t0=this.tDown==null?t:this.tDown;
+      const dur=t-t0;const fr=this.frame();
+      this.state='已起坐';
+      if(dur>=j.minDur)flash={kind:'valid',reason:'起坐到位，有效',ev:mkEv({t0,dur,frame:fr},trunk,dur)};
+      else flash={kind:'invalid',reason:'动作过快（'+dur.toFixed(2)+' 秒）',ev:mkEv({t0,dur,frame:fr},trunk,dur)};
+    }
+    function mkEv(a,minTrunk,dur){
+      return {n:0,t0:a.t0,t1:a.t0+dur,frame:a.frame||captureFrame(),
+        values:[['起坐终态躯干角',minTrunk.toFixed(1)+'°','≤ '+j.up+'°',minTrunk<=j.up],
+                ['回落基准角',dnTh.toFixed(0)+'°（自适应）','≥ '+dnTh.toFixed(0)+'°',true],
                 ['单次时长',dur.toFixed(2)+'s','≥ '+j.minDur+'s',dur>=j.minDur]]};
     }
-    return this.out(this.state==='待命'?'等待躺下就绪…':this.state==='抬起中'?'抬起中，回落到底结算':'躺下就绪，开始起坐',[
-      ['躯干角(肩-髋-膝)',trunk.toFixed(0)+'°'],['达标线',`起坐 ≤${j.up}° / 躺平 ≥${j.down}°`],['幅度进度',(progress*100).toFixed(0)+'%']
+    return this.out(this.state==='待命'?'请在画面内躺下，等待就绪…':this.state==='已起坐'?'已计一次，躺回准备下一次':'躺下就绪，开始起坐',[
+      ['躯干角(3D 肩-髋-膝)',trunk.toFixed(0)+'°'],['达标线',`起坐 ≤${j.up}° / 回位 ≥${dnTh.toFixed(0)}°`],['幅度进度',(Math.max(0,Math.min(1,progress))*100).toFixed(0)+'%']
     ],progress,flash);
   }
 }
@@ -1233,11 +1230,11 @@ class PushUpDet extends BaseDet{
       return this.out('待命',[['状态','非侧面水平视角']],0,null,'请从侧面拍摄，让身体呈水平状态');
     if(vis(lm,sh)<0.4||vis(lm,hip)<0.4||vis(lm,kn)<0.4||vis(lm,ak)<0.4)
       return this.out('待命',[['状态','肩/髋/膝未同时入镜']],0,null,'请从侧面拍摄，全身入镜');
-    const elbL=vis(lm,LM.elL)>0.4&&vis(lm,LM.wrL)>0.4?ang(lm[LM.shL],lm[LM.elL],lm[LM.wrL]):null;
-    const elbR=vis(lm,LM.elR)>0.4&&vis(lm,LM.wrR)>0.4?ang(lm[LM.shR],lm[LM.elR],lm[LM.wrR]):null;
+    const elbL=vis(lm,LM.elL)>0.4&&vis(lm,LM.wrL)>0.4?angL(lm,LM.shL,LM.elL,LM.wrL):null;
+    const elbR=vis(lm,LM.elR)>0.4&&vis(lm,LM.wrR)>0.4?angL(lm,LM.shR,LM.elR,LM.wrR):null;
     let elbow=(elbL!=null&&elbR!=null)?Math.min(elbL,elbR):(elbL!=null?elbL:(elbR!=null?elbR:180));
     elbow=this.ema('e',elbow);
-    const body=this.ema('b',ang(lm[sh],lm[hip],lm[ak]));          /* 肩-髋-踝：躯干+腿直线 */
+    const body=this.ema('b',angL(lm,sh,hip,ak));          /* 肩-髋-踝：躯干+腿直线（3D 优先） */
     const knee=this.ema('k',ang(lm[hip],lm[kn],lm[ak]));          /* 膝角：跪姿会明显 <110° */
     let flash=null,progress=Math.max(0,Math.min(1,(160-elbow)/65));
     if(this.state==='待命'){if(elbow>=152&&body>=j.straight)this.state='支撑就绪'}
@@ -1780,7 +1777,19 @@ function lmOf(r){
   const a=r&&r.landmarks&&r.landmarks[0];
   if(!a||!a.length)return null;
   for(const p of a)if(p.visibility==null)p.visibility=1;
+  try{const w=r.worldLandmarks&&r.worldLandmarks[0];if(w&&w.length)a.world=w}catch(e){}
   return a;
+}
+/* 角度：优先用 3D 世界坐标（不受机位透视影响），无则回退 2D 画面坐标 */
+function angL(lm,i,j,k){
+  const w=lm&&lm.world;
+  if(w&&w[i]&&w[j]&&w[k]){
+    const a=w[i],b=w[j],c=w[k];
+    const v1x=a.x-b.x,v1y=a.y-b.y,v1z=a.z-b.z,v2x=c.x-b.x,v2y=c.y-b.y,v2z=c.z-b.z;
+    const d=(v1x*v2x+v1y*v2y+v1z*v2z)/(Math.hypot(v1x,v1y,v1z)*Math.hypot(v2x,v2y,v2z)||1);
+    return Math.acos(Math.max(-1,Math.min(1,d)))*180/Math.PI;
+  }
+  return ang(lm[i],lm[j],lm[k]);
 }
 function handleResults(res){
   const lm=lmOf(res);
@@ -2746,9 +2755,9 @@ function lmPullup(elbowDeg,chinGap){
   return lm;
 }
 function runFrames(Det,frames){
-  const det=new Det();let last=null;const t0=frames[0][0];
-  for(const[t,lm]of frames){const r=det.update(lm,t-t0);if(r&&r.flash)last=r.flash}
-  return last;
+  const det=new Det();let last=null,anyValid=null;const t0=frames[0][0];
+  for(const[t,lm]of frames){const r=det.update(lm,t-t0);if(r&&r.flash){last=r.flash;if(r.flash.kind==='valid'&&!anyValid)anyValid=r.flash}}
+  return anyValid||last;
 }
 function detPullupValid(){
   const F=[];let t=0;
