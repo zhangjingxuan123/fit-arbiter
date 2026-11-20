@@ -1671,20 +1671,17 @@ function getPose(){
     const base=await pickTasksBase();
     const vision=await window.FilesetResolver.forVisionTasks(base);
     const model=await pickModelUrl();
-    const l=await window.PoseLandmarker.createFromOptions(vision,{
-      baseOptions:{modelAssetPath:model,delegate:'GPU'},
+    /* 模型字节由页面自己取（走 Service Worker 缓存），离线时也能拿到 */
+    let buf=null;
+    try{const r=await fetch(model);if(r.ok)buf=new Uint8Array(await r.arrayBuffer())}catch(e){}
+    const opts=(delegate)=>({
+      baseOptions:buf?{modelAssetBuffer:buf,delegate}:{modelAssetPath:model,delegate},
       runningMode:'VIDEO',numPoses:1,
       minPoseDetectionConfidence:0.4,minPosePresenceConfidence:0.4,minTrackingConfidence:0.4,
       outputSegmentationMasks:false
-    }).catch(async e=>{
-      /* GPU delegate 失败 → 回退 CPU */
-      return await window.PoseLandmarker.createFromOptions(vision,{
-        baseOptions:{modelAssetPath:model,delegate:'CPU'},
-        runningMode:'VIDEO',numPoses:1,
-        minPoseDetectionConfidence:0.4,minPosePresenceConfidence:0.4,minTrackingConfidence:0.4,
-        outputSegmentationMasks:false
-      });
     });
+    const l=await window.PoseLandmarker.createFromOptions(vision,opts('GPU'))
+      .catch(async()=>await window.PoseLandmarker.createFromOptions(vision,opts('CPU')));
     poseInst=l;return l;
   })();
   return poseP;
